@@ -17,8 +17,8 @@ CREATE TABLE usuarios (
     senha VARCHAR(255) NOT NULL,
     telefone VARCHAR(20),
     cidade VARCHAR(100),
-    estado VARCHAR(2),
-    cpf VARCHAR(14) UNIQUE NOT NULL,
+    estado CHAR(2),
+    cpf CHAR(14) UNIQUE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -27,12 +27,12 @@ CREATE TABLE servicos (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     descricao TEXT,
-    valor_minimo DECIMAL(10,2) NOT NULL,
-    valor_maximo DECIMAL(10,2) NOT NULL,
+    valor_minimo NUMERIC(10,2) NOT NULL,
+    valor_maximo NUMERIC(10,2) NOT NULL,
     data_inicio TIMESTAMP NOT NULL,
     data_fim TIMESTAMP,
     local VARCHAR(150),
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     metodo_pagamento VARCHAR(50),
     categoria_id INTEGER NOT NULL REFERENCES categorias(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -41,7 +41,7 @@ CREATE TABLE servicos (
 
 CREATE TABLE historico_logins (
     id SERIAL PRIMARY KEY,
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id),
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
     login_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -54,4 +54,19 @@ CREATE TABLE usuario_senhas (
     expirado_em TIMESTAMP,
     ativo BOOLEAN DEFAULT TRUE,
     CONSTRAINT uq_usuario_senha UNIQUE (usuario_id, hash)
+);
+
+CREATE TABLE historico_servicos (
+    id SERIAL PRIMARY KEY,
+    servico_id INTEGER NOT NULL REFERENCES servicos(id) ON DELETE CASCADE,
+    prestador_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    cliente_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    valor NUMERIC(10,2) NOT NULL,
+    data_inicio TIMESTAMP NOT NULL,
+    data_fim TIMESTAMP,
+    status VARCHAR(50) NOT NULL,
+    avaliacao_prestador INTEGER CHECK (avaliacao_prestador BETWEEN 1 AND 5),
+    avaliacao_cliente INTEGER CHECK (avaliacao_cliente BETWEEN 1 AND 5),
+    comentario TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

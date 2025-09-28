@@ -1,7 +1,7 @@
 // routes/auth.js
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // seu db.js
+const db = require('../db.mjs'); // seu db.js
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 

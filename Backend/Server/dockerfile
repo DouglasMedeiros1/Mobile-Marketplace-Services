@@ -1,0 +1,40 @@
+# --- STAGE 1: FASE DE BUILD ---
+# Usa uma imagem base com a sua versão de Node.js
+FROM node:20-slim AS builder
+
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia e instala as dependências
+# Isso aproveita o cache do Docker para instalações mais rápidas
+COPY package.json package-lock.json ./
+RUN npm install --omit=dev
+
+# Copia o restante do código (src, etc.)
+COPY . .
+
+# Se você compila seu código (ex: TypeScript para JS)
+# Adicione o comando de build aqui. Exemplo:
+# RUN npm run build
+
+# --- STAGE 2: FASE DE PRODUÇÃO ---
+# Imagem base final, bem limpa
+FROM node:20-slim 
+
+# Define o diretório de trabalho
+WORKDIR /app
+
+# Copia apenas as dependências e o código final (ou o código compilado) do stage 'builder'
+COPY --from=builder /app/node_modules ./node_modules
+# Se você compilou, copie a pasta de output (ex: 'dist')
+# COPY --from=builder /app/dist ./dist 
+# Se você roda JS/TS direto, copie o código fonte
+COPY . .
+
+# Expõe a porta que seu servidor Node.js está ouvindo
+# Altere para a porta correta do seu backend (ex: 3000, 8080)
+EXPOSE 3000
+
+# Comando para iniciar a aplicação quando o container rodar
+# Certifique-se de que este comando está no seu package.json
+CMD ["npm", "start"]

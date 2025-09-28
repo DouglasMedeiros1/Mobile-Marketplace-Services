@@ -1,23 +1,5 @@
-/*
-  Arquivos criados aqui (cole no seu projeto):
-  - src/screens/LoginScreen.tsx   (este componente: tela de login / registro)
-  - App.tsx                       (exemplo de integração com react-navigation e AsyncStorage)
 
-  Notas rápidas:
-  - Endpoints usados:
-    * Login:    https://mobile-marketplace-server-1-0-sgvh.onrender.com/login
-    * Register: https://mobile-marketplace-server-1-0-sgvh.onrender.com/register
-  - Ao logar/registrar o token retornado é salvo em AsyncStorage sob a chave 'token'.
-  - Em produção use armazenamento seguro (Keychain / EncryptedStorage) em vez de AsyncStorage.
-  - Este exemplo assume que o backend retorna JSON com campo { token: string } ao logar.
 
-  Dependências que você precisa instalar (Expo / React Native):
-    npm install @react-navigation/native @react-navigation/stack @react-native-async-storage/async-storage
-    npm install react-native-gesture-handler react-native-screens
-    # depois siga a configuração do react-navigation (ver docs) para gesture-handler/native-stack se necessário
-*/
-
-// src/screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import { SafeAreaView, View, Text, TextInput, Button, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -33,6 +15,7 @@ export default function LoginScreen() {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
+  const [cpf, setCpf] = useState('');
   const [telefone, setTelefone] = useState('');
   const [cidade, setCidade] = useState('');
   const [estado, setEstado] = useState('');
@@ -44,16 +27,25 @@ export default function LoginScreen() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${BASE_URL}/login`, {
+      const res = await fetch(`${BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, senha }),
       });
 
-      const body = await res.json();
+      let body;
+      try {
+        body = await res.json();
+      } catch (jsonError) {
+        // Se não conseguir fazer parse do JSON, pega o texto da resposta
+        const textResponse = await res.text();
+        console.error('Erro ao fazer parse do JSON:', textResponse);
+        throw new Error(`Erro do servidor (${res.status}): ${textResponse.substring(0, 100)}...`);
+      }
+      
       if (!res.ok) {
         // backend pode retornar mensagem de erro em body.message
-        const msg = body?.message || `Erro ${res.status}`;
+        const msg = body?.message || body?.error || `Erro ${res.status}`;
         throw new Error(msg);
       }
 
@@ -62,7 +54,7 @@ export default function LoginScreen() {
 
       await AsyncStorage.setItem('token', token);
       // navega para a tela principal removendo a tela de login da stack
-      navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'index' }] });
     } catch (err: any) {
       setError(err.message ?? 'Erro ao logar');
     } finally {
@@ -74,20 +66,36 @@ export default function LoginScreen() {
     setLoading(true);
     setError(null);
     try {
-      const payload: any = { nome, email, senha };
+      // Validação dos campos obrigatórios
+      if (!nome || !email || !senha || !cpf) {
+        setError('Nome, email, senha e CPF são obrigatórios');
+        setLoading(false);
+        return;
+      }
+
+      const payload: any = { nome, email, senha, cpf };
       if (telefone) payload.telefone = telefone;
       if (cidade) payload.cidade = cidade;
       if (estado) payload.estado = estado;
 
-      const res = await fetch(`${BASE_URL}/register`, {
+      const res = await fetch(`${BASE_URL}/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      const body = await res.json();
+      let body;
+      try {
+        body = await res.json();
+      } catch (jsonError) {
+        // Se não conseguir fazer parse do JSON, pega o texto da resposta
+        const textResponse = await res.text();
+        console.error('Erro ao fazer parse do JSON:', textResponse);
+        throw new Error(`Erro do servidor (${res.status}): ${textResponse.substring(0, 100)}...`);
+      }
+      
       if (!res.ok) {
-        const msg = body?.message || `Erro ${res.status}`;
+        const msg = body?.message || body?.error || `Erro ${res.status}`;
         throw new Error(msg);
       }
 
@@ -95,7 +103,7 @@ export default function LoginScreen() {
       const token = body?.token;
       if (token) {
         await AsyncStorage.setItem('token', token);
-        navigation.reset({ index: 0, routes: [{ name: 'Main' }] });
+        navigation.reset({ index: 0, routes: [{ name: 'index' }] });
         return;
       }
 
@@ -123,6 +131,7 @@ export default function LoginScreen() {
 
         {mode === 'register' && (
           <>
+            <TextInput placeholder="CPF" value={cpf} onChangeText={setCpf} style={styles.input} keyboardType="numeric" />
             <TextInput placeholder="Telefone" value={telefone} onChangeText={setTelefone} style={styles.input} keyboardType="phone-pad" />
             <TextInput placeholder="Cidade" value={cidade} onChangeText={setCidade} style={styles.input} />
             <TextInput placeholder="Estado" value={estado} onChangeText={setEstado} style={styles.input} />

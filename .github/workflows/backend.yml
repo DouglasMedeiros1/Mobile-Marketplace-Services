@@ -31,7 +31,7 @@ jobs:
         with:
           node-version: '20' # Use a versão do Node.js que você prefere (ex: 18, 20)
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json # Cache de dependências específico para o back-end
+          cache-dependency-path: Backend/Server/package-lock.json # Cache de dependências específico para o back-end
 
       - name: Instalar Dependências do Back-end
         run: npm ci # 'ci' é mais rápido e recomendado para ambientes de CI do que 'install'

@@ -1,0 +1,41 @@
+name: Teste do Back-end (Express)
+
+on:
+  push:
+    branches:
+      - main
+      - Development
+    paths:
+      - 'Backend/**' # Executa apenas se houver alterações na pasta backend
+  pull_request:
+    branches:
+      - main
+      - Development
+    paths:
+      - 'Backend/**' # Executa apenas se houver alterações na pasta backend
+
+jobs:
+  build-and-test-backend:
+    runs-on: ubuntu-latest # Usa a máquina virtual Linux mais recente
+    
+    defaults:
+      run:
+        working-directory: ./Backend # Define o diretório de trabalho padrão para o back-end
+        
+    steps:
+      - name: Checkout do Código
+        uses: actions/checkout@v4 # Baixa o código do repositório
+        
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Use a versão do Node.js que você prefere (ex: 18, 20)
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json # Cache de dependências específico para o back-end
+
+      - name: Instalar Dependências do Back-end
+        run: npm ci # 'ci' é mais rápido e recomendado para ambientes de CI do que 'install'
+
+      - name: Executar Teste (Verificar Inicialização)
+        # O comando "npm test" será executado na pasta "./backend"
+        run: npm test

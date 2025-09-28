@@ -1,0 +1,53 @@
+name: Teste do Front-end (Expo/React Native)
+
+on:
+  push:
+    branches:
+      - main
+      - Development
+    paths:
+      - 'Frontend/**' # Executa apenas se houver alterações na pasta frontend
+  pull_request:
+    branches:
+      - main
+      - Development
+    paths:
+      - 'Frontend/**' # Executa apenas se houver alterações na pasta frontend
+
+jobs:
+  build-and-test-frontend:
+    # Máquinas virtuais GitHub Actions vêm com o Node.js e ferramentas essenciais pré-instaladas.
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./Frontend/mobileMarketplace # Define o diretório de trabalho para o front-end
+        
+    steps:
+      - name: Checkout do Código
+        uses: actions/checkout@v4 # Baixa o código do repositório
+        
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Mantenha a versão do Node.js consistente
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json # Cache de dependências
+          
+      # Se você usar o CLI do Expo, pode ser útil instalá-lo globalmente
+      - name: Instalar Expo CLI (Opcional)
+        run: npm install -g expo-cli
+
+      - name: Instalar Dependências
+        # npm ci é o comando recomendado para ambientes de CI/CD para instalações limpas.
+        run: npm ci 
+
+      - name: Executar Linter e Testes Unitários
+        # No contexto de um projeto React Native, "npm test" geralmente executa Jest ou testes unitários.
+        # Ele verifica se o código está funcional e inicia, sem a necessidade de emulador.
+        run: npm test
+        
+      # Passo Opcional: Verificação de Build do Expo (Se necessário)
+      # Se quiser validar que o projeto compila sem erros, você pode adicionar:
+      # - name: Tentar buildar o app (Checagem de erros de compilação)
+      #   run: npx expo prebuild --no-install

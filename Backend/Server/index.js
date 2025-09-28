@@ -1,5 +1,6 @@
 const express = require('express');
-const db = require('./db.mjs');
+const dbModule = require('./db.mjs'); 
+const db = dbModule.default;
 const cors = require('cors');
 
 const userRoutes = require('./routes/user');

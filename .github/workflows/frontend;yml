@@ -32,7 +32,7 @@ jobs:
         with:
           node-version: '20' # Mantenha a versão do Node.js consistente
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json # Cache de dependências
+          cache-dependency-path: Frontend/mobileMarketplace/package-lock.json # Cache de dependências
           
       # Se você usar o CLI do Expo, pode ser útil instalá-lo globalmente
       - name: Instalar Expo CLI (Opcional)

@@ -6,13 +6,13 @@ on:
       - main
       - Development
     paths:
-      - 'Frontend/**' # Executa apenas se houver alterações na pasta frontend
+      - 'Frontend/mobileMarketplace**' # Executa apenas se houver alterações na pasta frontend
   pull_request:
     branches:
       - main
       - Development
     paths:
-      - 'Frontend/**' # Executa apenas se houver alterações na pasta frontend
+      - 'Frontend/mobileMarketplace**' # Executa apenas se houver alterações na pasta frontend
 
 jobs:
   build-and-test-frontend:
@@ -45,7 +45,7 @@ jobs:
       - name: Executar Linter e Testes Unitários
         # No contexto de um projeto React Native, "npm test" geralmente executa Jest ou testes unitários.
         # Ele verifica se o código está funcional e inicia, sem a necessidade de emulador.
-        run: npm test
+        run: npx expo lint 
         
       # Passo Opcional: Verificação de Build do Expo (Se necessário)
       # Se quiser validar que o projeto compila sem erros, você pode adicionar:

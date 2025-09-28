@@ -6,13 +6,13 @@ on:
       - main
       - Development
     paths:
-      - 'Backend/**' # Executa apenas se houver alterações na pasta backend
+      - 'Backend/Server**' # Executa apenas se houver alterações na pasta backend
   pull_request:
     branches:
       - main
       - Development
     paths:
-      - 'Backend/**' # Executa apenas se houver alterações na pasta backend
+      - 'Backend/Server**' # Executa apenas se houver alterações na pasta backend
 
 jobs:
   build-and-test-backend:
@@ -20,7 +20,7 @@ jobs:
     
     defaults:
       run:
-        working-directory: ./Backend # Define o diretório de trabalho padrão para o back-end
+        working-directory: ./Backend/Server # Define o diretório de trabalho padrão para o back-end
         
     steps:
       - name: Checkout do Código

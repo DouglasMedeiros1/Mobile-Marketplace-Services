@@ -1,29 +1,31 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db.mjs');
+const dbModule = require('../db.mjs'); 
+const db = dbModule.default; 
 
 // GET - Listar Usuarios
 
 router.get('/', async (req, res) => {
     try {
-        const result = await db.query('SELECT * FROM usuarios');
-        res.status(200).json(result.rows);
+
+        const result = await db`SELECT * FROM usuarios`; 
+        res.status(200).json(result); 
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// GET - Listar Usuario Unico
+// GET - Listar Usuario por ID
 
 router.get('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await db.query('SELECT * FROM usuarios WHERE id = $1', [id]);
-        if (result.rows.length === 0) {
+        const result = await db`SELECT * FROM usuarios WHERE id = ${id}`;
+        if (result.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.status(200).json(result.rows[0]);
+        res.status(200).json(result[0]); 
     }
     catch (err) {
         console.error(err);
@@ -36,11 +38,11 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
     const { name, email, password, telefone, cidade, estado, cpf } = req.body;
     try {
-        const result = await db.query(
-            'INSERT INTO usuarios (nome, email, senha, telefone, cidade, estado, cpf) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
-            [name, email, password, telefone, cidade, estado, cpf]
-        );
-        res.status(201).json(result.rows[0]);
+        const result = await db`
+            INSERT INTO usuarios (nome, email, senha, telefone, cidade, estado, cpf) 
+            VALUES (${name}, ${email}, ${password}, ${telefone}, ${cidade}, ${estado}, ${cpf}) 
+            RETURNING *`;
+        res.status(201).json(result[0]); 
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -51,16 +53,20 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, email, password, telefone, cidade, cpf } = req.body;
+
+    const { name, email, password, telefone, cidade, estado, cpf } = req.body; 
     try {
-        const result = await db.query(
-            'UPDATE usuarios SET name = $1, email = $2, password = $3, telefone = $4, cidade = $5 WHERE id = $6 RETURNING *',
-            [name, email, password, telefone, cidade, cpf, id]
-        );
-        if (result.rows.length === 0) {
+
+        const result = await db`
+            UPDATE usuarios SET 
+            nome = ${name}, email = ${email}, senha = ${password}, telefone = ${telefone}, cidade = ${cidade}, estado = ${estado}, cpf = ${cpf} 
+            WHERE id = ${id} 
+            RETURNING *`;
+
+        if (result.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.status(200).json(result.rows[0]);
+        res.status(200).json(result[0]); 
     } catch (err) {
         console.error(err);
         res.status(500).json({ error: 'Internal Server Error' });
@@ -72,8 +78,8 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res)  => {
     const { id } = req.params;
     try {
-        const result = await db.query('DELETE FROM usuarios WHERE id = $1 RETURNING *', [id]);
-        if (result.rows.length === 0) {
+        const result = await db`DELETE FROM usuarios WHERE id = ${id} RETURNING *`;
+        if (result.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
         res.status(200).json({ message: 'User deleted successfully' });

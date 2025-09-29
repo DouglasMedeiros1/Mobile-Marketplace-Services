@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const BASE_URL = 'https://mobile-marketplace-server-1-0-sgvh.onrender.com/auth';
 const USER_URL = 'https://mobile-marketplace-server-1-0-sgvh.onrender.com/users'; 
+const SERVICES_URL = 'https://mobile-marketplace-server-1-0-sgvh.onrender.com/services';
 
 /**
  * Função utilitária CRUCIAL para ler o corpo da resposta de forma robusta.
@@ -10,16 +11,14 @@ const USER_URL = 'https://mobile-marketplace-server-1-0-sgvh.onrender.com/users'
  * ou retorna uma mensagem clara de erro (seja JSON de erro ou HTML/texto).
  */
 async function readResponse(response: Response) {
-    // 1. LER O CORPO APENAS UMA VEZ COMO TEXTO (Fixa o erro "Already read")
+    // 1. LER O CORPO APENAS UMA VEZ COMO TEXTO
     const responseText = await response.text(); 
 
     // --- Resposta OK (2xx) ---
     if (response.ok) {
         try {
-            // Tenta analisar o texto lido como JSON
             return JSON.parse(responseText); 
         } catch (e) {
-            // 204 No Content não retorna corpo, mas é sucesso
             if (response.status === 204) return {}; 
             
             console.error("Resposta de sucesso inesperada, não é JSON:", responseText.substring(0, 100));
@@ -31,17 +30,14 @@ async function readResponse(response: Response) {
         let errorMessage = `Falha na requisição com status: ${response.status}`;
         
         try {
-            // Tenta analisar o texto de erro como JSON (erro esperado)
             const errorData = JSON.parse(responseText);
             errorMessage = errorData.error || errorData.message || errorMessage;
             
         } catch (e) {
-            // Se não for JSON (HTML/Texto de erro), usa o texto puro como mensagem
             console.error("Resposta de erro não é JSON. Server response:", responseText.substring(0, 100));
             errorMessage = responseText.substring(0, 100) || errorMessage; 
         }
         
-        // Lança a mensagem de erro (JSON ou HTML/Texto)
         throw new Error(errorMessage);
     }
 }
@@ -49,6 +45,7 @@ async function readResponse(response: Response) {
 
 /**
  * Função Auxiliar - Usada para Rotas Protegidas (envia o token Bearer).
+ * ... (Código fetchWithAuth omitido, presumindo que está correto)
  */
 async function fetchWithAuth(url: string, method: string = 'GET', body: any = null) {
     const token = await AsyncStorage.getItem('user_auth_token');
@@ -137,9 +134,8 @@ export async function logoutUser() {
 }
 
 export async function createService(data: any) {
-    // A função fetchWithAuth é a que envia o token no cabeçalho.
     return fetchWithAuth(
-        `${BASE_URL}/services`, 
+        SERVICES_URL, 
         'POST', 
         data
     ); 

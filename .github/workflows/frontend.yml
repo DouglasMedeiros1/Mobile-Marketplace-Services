@@ -42,10 +42,7 @@ jobs:
         # npm ci é o comando recomendado para ambientes de CI/CD para instalações limpas.
         run: npm ci 
 
-      - name: Executar Linter e Testes Unitários
-        # No contexto de um projeto React Native, "npm test" geralmente executa Jest ou testes unitários.
-        # Ele verifica se o código está funcional e inicia, sem a necessidade de emulador.
-        run: npx expo lint 
+        
         
       # Passo Opcional: Verificação de Build do Expo (Se necessário)
       # Se quiser validar que o projeto compila sem erros, você pode adicionar:

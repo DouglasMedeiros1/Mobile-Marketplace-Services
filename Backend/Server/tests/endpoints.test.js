@@ -13,7 +13,7 @@ const authModule = require('../routes/auth');
 authModule.tokenBlacklist = [];
 
 // Agora pode importar o app
-const app = require('../index');
+const app = require('../app');
 
 describe('Testes básicos dos endpoints da API', () => {
   // AUTENTICAÇÃO

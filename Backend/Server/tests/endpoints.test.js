@@ -3,17 +3,20 @@ jest.mock('../db.mjs', () => ({
   __esModule: true,
   default: {
     query: jest.fn().mockResolvedValue([]),
-    // Adicione outras funções mockadas se necessário
   }
 }));
 
-// Mock do routes/auth para garantir que tokenBlacklist exista
-jest.mock('../routes/auth', () => ({
-  tokenBlacklist: [],
-}));
+// Mock parcial do routes/auth: mantém tudo real, só sobrescreve tokenBlacklist
+jest.mock('../routes/auth', () => {
+  const actual = jest.requireActual('../routes/auth');
+  return {
+    ...actual,
+    tokenBlacklist: [],
+  };
+});
 
 const request = require('supertest');
-const app = require('../index'); // Certifique-se que seu index.js exporta o app Express
+const app = require('../index');
 
 describe('Testes básicos dos endpoints da API', () => {
   // AUTENTICAÇÃO

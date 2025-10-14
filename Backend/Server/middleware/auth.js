@@ -1,34 +1,53 @@
 // middleware/auth.js
 const jwt = require('jsonwebtoken');
 
-// 🌟 Importa a blacklist diretamente do módulo de rotas (routes/auth.js)
-// Este é o método mais simples para projetos pequenos.
-const { tokenBlacklist } = require('../routes/auth'); 
+// Blacklist de tokens (importada do módulo de rotas)
+const { tokenBlacklist } = require('../routes/auth');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 
-module.exports = function (req, res, next) {
+// Middleware de autenticação JWT
+function authenticateToken(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) return res.status(401).json({ error: 'Token não fornecido' });
 
-  const parts = authHeader.split(' ');
-  if (parts.length !== 2) return res.status(401).json({ error: 'Token inválido' });
+  const [scheme, token] = authHeader.split(' ');
+  if (scheme !== 'Bearer' || !token) return res.status(401).json({ error: 'Token malformado' });
 
-  const scheme = parts[0];
-  const token = parts[1];
-
-  if (!/^Bearer$/i.test(scheme)) return res.status(401).json({ error: 'Token malformado' });
-
-  // 🌟 VERIFICAÇÃO DE BLACKLIST
-  if (tokenBlacklist.includes(token)) {
-    return res.status(401).json({ error: 'Token inválido (revogado)' });
+  // Verifica se o token está na blacklist
+  if (tokenBlacklist && tokenBlacklist.includes(token)) {
+    return res.status(401).json({ error: 'Token revogado' });
   }
 
   try {
     const payload = jwt.verify(token, JWT_SECRET);
-    req.user = { id: payload.userId };
+    // payload deve conter: { userId, roles }
+    req.user = {
+      id: payload.userId,
+      roles: payload.roles || []
+    };
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Token inválido ou expirado' });
   }
+}
+
+// Middleware para autorização por role
+function authorizeRoles(...allowedRoles) {
+  return (req, res, next) => {
+    if (!req.user || !req.user.roles) {
+      return res.status(403).json({ error: 'Acesso negado' });
+    }
+    // Se o usuário possuir pelo menos um dos roles permitidos
+    const hasRole = req.user.roles.some(role => allowedRoles.includes(role));
+    if (!hasRole) {
+      return res.status(403).json({ error: 'Permissão insuficiente' });
+    }
+    next();
+  };
+}
+
+module.exports = {
+  authenticateToken,
+  authorizeRoles
 };

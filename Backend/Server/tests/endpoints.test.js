@@ -6,16 +6,13 @@ jest.mock('../db.mjs', () => ({
   }
 }));
 
-// Mock parcial do routes/auth: mantém tudo real, só sobrescreve tokenBlacklist
-jest.mock('../routes/auth', () => {
-  const actual = jest.requireActual('../routes/auth');
-  return {
-    ...actual,
-    tokenBlacklist: [],
-  };
-});
-
 const request = require('supertest');
+
+// Importa o router e sobrescreve o tokenBlacklist ANTES de importar o app
+const authModule = require('../routes/auth');
+authModule.tokenBlacklist = [];
+
+// Agora pode importar o app
 const app = require('../index');
 
 describe('Testes básicos dos endpoints da API', () => {

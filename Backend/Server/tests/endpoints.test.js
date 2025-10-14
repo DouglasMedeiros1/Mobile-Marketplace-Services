@@ -1,3 +1,12 @@
+jest.mock('../db.mjs', () => ({
+  __esModule: true,
+  default: {
+    // Mock das funções que você usa, por exemplo:
+    // query: jest.fn().mockResolvedValue([]),
+    // ou qualquer função que seu código espera do db
+  }
+}));
+
 const request = require('supertest');
 const app = require('../index'); // Certifique-se que seu index.js exporta o app Express
 

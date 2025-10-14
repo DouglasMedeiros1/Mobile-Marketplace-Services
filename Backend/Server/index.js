@@ -5,15 +5,13 @@ const cors = require('cors');
 
 const userRoutes = require('./routes/user');
 const serviceRoutes = require('./routes/services');
+const companyRoutes = require('./routes/company');
+const proposalsRoutes = require('./routes/proposals');
 
 const authModule = require('./routes/auth');
 const authRouter = authModule.router;
 
-const tokenBlacklist = authModule.tokenBlacklist;
-
-const authMiddleware = require('./middleware/auth');
-authMiddleware.setTokenBlacklist
-
+const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
 const port = 3000;
@@ -25,9 +23,14 @@ app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
+// Rotas públicas
 app.use('/auth', authRouter);
-app.use('/users', userRoutes);
-app.use('/services', serviceRoutes);
+
+// Rotas protegidas
+app.use('/users', authenticateToken, userRoutes);
+app.use('/services', authenticateToken, serviceRoutes);
+app.use('/company', authenticateToken, companyRoutes);
+app.use('/proposals', authenticateToken, proposalsRoutes);
 
 app.listen(port, () => {
   console.log(`Example app listening at http://localhost:${port}`);

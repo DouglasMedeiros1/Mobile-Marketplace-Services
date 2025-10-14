@@ -6,7 +6,7 @@ const db = dbModule.default;
 // GET - Listar todos os serviços
 router.get('/', async (req, res) => {
     try {
-        const result = await db`SELECT * FROM servicos ORDER BY id`;
+        const result = await db`SELECT * FROM services ORDER BY id`;
         res.status(200).json(result); 
     } catch (err) {
         console.error(err);
@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await db`SELECT * FROM servicos WHERE id = ${id}`;
+        const result = await db`SELECT * FROM services WHERE id = ${id}`;
         if (result.length === 0) {
             return res.status(404).json({ error: 'Serviço não encontrado' });
         }
@@ -39,22 +39,20 @@ router.post('/', async (req, res) => {
         data_inicio,
         data_fim,
         local,
-        usuario_id,
+        user_id,
         metodo_pagamento,
-        categoria_id
+        category_id
     } = req.body;
 
-
-    if (!nome || valor_minimo == null || valor_maximo == null || !data_inicio || !usuario_id || !categoria_id) {
-        return res.status(400).json({ error: 'Campos obrigatórios: nome, valor_minimo, valor_maximo, data_inicio, usuario_id, categoria_id' });
+    if (!nome || valor_minimo == null || valor_maximo == null || !data_fim || !user_id || !category_id) {
+        return res.status(400).json({ error: 'Campos obrigatórios: nome, valor_minimo, valor_maximo, data_fim, user_id, category_id' });
     }
 
     try {
-
         const result = await db`
-            INSERT INTO servicos
-            (nome, descricao, valor_minimo, valor_maximo, data_inicio, data_fim, local, usuario_id, metodo_pagamento, categoria_id)
-            VALUES (${nome}, ${descricao}, ${valor_minimo}, ${valor_maximo}, ${data_inicio}, ${data_fim}, ${local}, ${usuario_id}, ${metodo_pagamento}, ${categoria_id})
+            INSERT INTO services
+            (nome, descricao, valor_minimo, valor_maximo, data_inicio, data_fim, local, user_id, metodo_pagamento, category_id)
+            VALUES (${nome}, ${descricao}, ${valor_minimo}, ${valor_maximo}, ${data_inicio}, ${data_fim}, ${local}, ${user_id}, ${metodo_pagamento}, ${category_id})
             RETURNING *`;
         res.status(201).json(result[0]); 
     } catch (err) {
@@ -74,20 +72,18 @@ router.put('/:id', async (req, res) => {
         data_inicio,
         data_fim,
         local,
-        usuario_id,
+        user_id,
         metodo_pagamento,
-        categoria_id
+        category_id
     } = req.body;
 
-
-    if (!nome || valor_minimo == null || valor_maximo == null || !data_inicio || !usuario_id || !categoria_id) {
-        return res.status(400).json({ error: 'Campos obrigatórios: nome, valor_minimo, valor_maximo, data_inicio, usuario_id, categoria_id' });
+    if (!nome || valor_minimo == null || valor_maximo == null || !data_fim || !user_id || !category_id) {
+        return res.status(400).json({ error: 'Campos obrigatórios: nome, valor_minimo, valor_maximo, data_fim, user_id, category_id' });
     }
 
     try {
-
         const result = await db`
-            UPDATE servicos SET
+            UPDATE services SET
                 nome = ${nome},
                 descricao = ${descricao},
                 valor_minimo = ${valor_minimo},
@@ -95,13 +91,12 @@ router.put('/:id', async (req, res) => {
                 data_inicio = ${data_inicio},
                 data_fim = ${data_fim},
                 local = ${local},
-                usuario_id = ${usuario_id},
+                user_id = ${user_id},
                 metodo_pagamento = ${metodo_pagamento},
-                categoria_id = ${categoria_id},
+                category_id = ${category_id},
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = ${id}
             RETURNING *`;
-
 
         if (result.length === 0) {
             return res.status(404).json({ error: 'Serviço não encontrado' });
@@ -118,8 +113,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-
-        const result = await db`DELETE FROM servicos WHERE id = ${id} RETURNING *`;
+        const result = await db`DELETE FROM services WHERE id = ${id} RETURNING *`;
 
         if (result.length === 0) {
             return res.status(404).json({ error: 'Serviço não encontrado' });

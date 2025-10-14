@@ -82,7 +82,7 @@ CREATE TABLE proposals (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (service_id, prestador_id)
-)
+);
 
 CREATE TABLE record_login (
     id SERIAL PRIMARY KEY,

@@ -1,10 +1,15 @@
+// Mock do db.mjs
 jest.mock('../db.mjs', () => ({
   __esModule: true,
   default: {
-    // Mock das funções que você usa, por exemplo:
-    // query: jest.fn().mockResolvedValue([]),
-    // ou qualquer função que seu código espera do db
+    query: jest.fn().mockResolvedValue([]),
+    // Adicione outras funções mockadas se necessário
   }
+}));
+
+// Mock do routes/auth para garantir que tokenBlacklist exista
+jest.mock('../routes/auth', () => ({
+  tokenBlacklist: [],
 }));
 
 const request = require('supertest');

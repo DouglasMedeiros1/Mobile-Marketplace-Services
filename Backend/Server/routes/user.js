@@ -1,84 +1,110 @@
-const express = require('express');
+import express from 'express';
+import pool from '../db.js'; // pool from pg
 const router = express.Router();
-const dbModule = require('../db.mjs'); 
-const db = dbModule.default; 
 
-// GET - Listar Usuarios
+// ---------- Usuários (clientes) ----------
 
-router.get('/', async (req, res) => {
-    try {
+// POST /usuarios -> Criar usuário com role 'cliente'
+router.post('/usuarios', async (req, res) => {
+    const nome = req.body.nome ?? req.body.name;
+    const email = req.body.email;
+    const senha = req.body.senha ?? req.body.password;
+    const telefone = req.body.telefone ?? req.body.phone;
 
-        const result = await db`SELECT * FROM usuarios`; 
-        res.status(200).json(result); 
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Internal Server Error' });
+    if (!nome || !email || !senha) {
+        console.log('POST /usuarios - missing fields');
+        return res.status(400).json({ error: 'nome, email and senha are required' });
     }
-});
 
-// GET - Listar Usuario por ID
-
-router.get('/:id', async (req, res) => {
-    const { id } = req.params;
     try {
-        const result = await db`SELECT * FROM usuarios WHERE id = ${id}`;
-        if (result.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
+        const query = `
+            INSERT INTO usuarios (nome, email, senha, telefone, role)
+            VALUES ($1, $2, $3, $4, 'cliente')
+            RETURNING id, nome, email, telefone, role, created_at, updated_at
+        `;
+        const { rows } = await pool.query(query, [nome, email, senha, telefone]);
+        console.log('User created:', rows[0].id);
+        return res.status(201).json(rows[0]);
+    } catch (err) {
+        console.error('POST /usuarios error', err);
+        if (err.code === '23505') { // unique_violation
+            return res.status(409).json({ error: 'Email already in use' });
         }
-        res.status(200).json(result[0]); 
-    }
-    catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Internal Server Error' });
+        return res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// POST - Criar Usuario
-
-router.post('/', async (req, res) => {
-    const { name, email, password, telefone, cidade, estado, cpf } = req.body;
+// GET /usuarios -> Listar todos os usuários (sem senha)
+router.get('/usuarios', async (_req, res) => {
     try {
-        const result = await db`
-            INSERT INTO usuarios (nome, email, senha, telefone, cidade, estado, cpf) 
-            VALUES (${name}, ${email}, ${password}, ${telefone}, ${cidade}, ${estado}, ${cpf}) 
-            RETURNING *`;
-        res.status(201).json(result[0]); 
+        const query = `
+            SELECT id, nome, email, telefone, role, created_at, updated_at
+            FROM usuarios
+            ORDER BY id
+        `;
+        const { rows } = await pool.query(query);
+        console.log('Fetched users:', rows.length);
+        return res.status(200).json(rows);
+    } catch (err) {
+        console.error('GET /usuarios error', err);
+        return res.status(500).json({ error: 'Internal Server Error' });
+    }
+    try {
+        const inserted = await db`
+            INSERT INTO usuarios (nome, email, senha, telefone)
+            VALUES (${nome}, ${email}, ${senha}, ${telefone})
+            RETURNING id, nome, email, telefone, created_at, updated_at
+        `;
+        res.status(201).json(inserted[0]);
     } catch (err) {
         console.error(err);
+        if (err.code === '23505') { // unique_violation
+            return res.status(409).json({ error: 'Email already in use' });
+        }
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
 // PUT - Atualizar Usuario
-
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
+    const nome = req.body.nome ?? req.body.name;
+    const email = req.body.email;
+    const senha = req.body.senha ?? req.body.password;
+    const telefone = req.body.telefone ?? req.body.phone;
 
-    const { name, email, password, telefone, cidade, estado, cpf } = req.body; 
     try {
-
-        const result = await db`
-            UPDATE usuarios SET 
-            nome = ${name}, email = ${email}, senha = ${password}, telefone = ${telefone}, cidade = ${cidade}, estado = ${estado}, cpf = ${cpf} 
-            WHERE id = ${id} 
-            RETURNING *`;
-
-        if (result.length === 0) {
+        // Atualiza apenas os campos fornecidos
+        const existing = await db`SELECT * FROM usuarios WHERE id = ${id}`;
+        if (existing.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-        res.status(200).json(result[0]); 
+
+        const updated = await db`
+            UPDATE usuarios SET
+                nome = COALESCE(${nome}, nome),
+                email = COALESCE(${email}, email),
+                senha = COALESCE(${senha}, senha),
+                telefone = COALESCE(${telefone}, telefone),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ${id}
+            RETURNING id, nome, email, telefone, created_at, updated_at
+        `;
+        res.status(200).json(updated[0]);
     } catch (err) {
         console.error(err);
+        if (err.code === '23505') {
+            return res.status(409).json({ error: 'Email already in use' });
+        }
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
 // DELETE - Deletar Usuario
-
 router.delete('/:id', async (req, res)  => {
     const { id } = req.params;
     try {
-        const result = await db`DELETE FROM usuarios WHERE id = ${id} RETURNING *`;
+        const result = await db`DELETE FROM usuarios WHERE id = ${id} RETURNING id`;
         if (result.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }

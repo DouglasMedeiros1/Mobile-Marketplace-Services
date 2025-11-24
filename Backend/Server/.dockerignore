@@ -1,13 +1,33 @@
-# Ignora a pasta de dependências local
+# Dependências (serão instaladas no container)
 node_modules
 
-# Ignora o arquivo de variáveis de ambiente.
-# As variáveis serão injetadas em tempo de execução.
+# Arquivos de ambiente (use variáveis de ambiente do container/orquestrador)
 .env
+.env.*
 
-# Ignora arquivos de log e temporários
+# Testes
+tests/
+*.test.js
+__tests__/
+coverage/
+jest.config.js
+
+# Arquivos de log
 npm-debug.log*
 yarn-debug.log*
+yarn-error.log*
+*.log
 
-# Ignora o Git
+# Git
 .git
+.gitignore
+
+# Docker
+dockerfile
+.dockerignore
+
+# Documentação e outros
+README.md
+readme.md
+.vscode/
+.idea/

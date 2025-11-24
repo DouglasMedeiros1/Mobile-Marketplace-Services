@@ -7,6 +7,7 @@ const userRoutes = require('./routes/user');
 const serviceRoutes = require('./routes/services');
 const companyRoutes = require('./routes/company');
 const proposalsRoutes = require('./routes/proposals');
+const rolesRoutes = require('./routes/roles');
 
 const authModule = require('./routes/auth');
 const authRouter = authModule.router;
@@ -25,9 +26,12 @@ app.get('/', (req, res) => {
 // Rotas públicas
 app.use('/auth', authRouter);
 
+// Rotas de serviços (GET público, POST/PUT/DELETE protegidos dentro da rota)
+app.use('/services', serviceRoutes);
+
 // Rotas protegidas
-app.use('/users', authenticateToken, userRoutes);
-app.use('/services', authenticateToken, serviceRoutes);
+app.use('/user', authenticateToken, userRoutes);
+app.use('/user', authenticateToken, rolesRoutes); // Gerenciamento de roles
 app.use('/company', authenticateToken, companyRoutes);
 app.use('/proposals', authenticateToken, proposalsRoutes);
 

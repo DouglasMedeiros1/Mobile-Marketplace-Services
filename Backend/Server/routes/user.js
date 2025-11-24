@@ -15,9 +15,10 @@ router.get('/all', authenticateToken, authorizeRoles('admin'), async (req, res) 
             GROUP BY u.id
             ORDER BY u.id
         `;
+        // Garante que senha nunca seja exposta
         res.status(200).json(result);
     } catch (err) {
-        console.error(err);
+        console.error('GET /users/all ERROR:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
@@ -39,7 +40,7 @@ router.get('/me', authenticateToken, async (req, res) => {
         }
         res.status(200).json(result[0]);
     } catch (err) {
-        console.error(err);
+        console.error('GET /users/me ERROR:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
@@ -61,109 +62,69 @@ router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) 
         }
         res.status(200).json(result[0]);
     } catch (err) {
-        console.error(err);
+        console.error('GET /users/:id ERROR:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// Função auxiliar para buscar roles de um usuário
-async function getUserRoles(userId) {
-    const roles = await db`SELECT role FROM role_user WHERE user_id = ${userId}`;
-    return roles.map(r => r.role);
-}
-
-// Função auxiliar para buscar empresas de um usuário (funcionário/supervisor)
-async function getUserCompanies(userId) {
-    const companies = await db`SELECT company_id, company_role FROM company_user WHERE user_id = ${userId}`;
-    return companies;
-}
-
-// PUT - Atualizar usuário por ID (admin, supervisor, ou conforme regras)
+// PUT - Atualizar usuário por ID (próprio usuário ou admin)
 router.put('/:id', authenticateToken, async (req, res) => {
     const targetUserId = parseInt(req.params.id, 10);
     const requesterId = req.user.id;
+    const requesterRoles = req.user.roles || [];
 
     if (isNaN(targetUserId)) {
         return res.status(400).json({ error: 'ID inválido' });
     }
 
+    // Autorização: próprio usuário ou admin
+    const isOwnProfile = requesterId === targetUserId;
+    const isAdmin = requesterRoles.includes('admin');
+
+    if (!isOwnProfile && !isAdmin) {
+        return res.status(403).json({ error: 'Acesso negado. Você só pode editar seu próprio perfil.' });
+    }
+
     try {
-        // Busca roles dos envolvidos
-        const requesterRoles = await getUserRoles(requesterId);
-        const targetRoles = await getUserRoles(targetUserId);
-
-        // Busca empresas dos envolvidos (se necessário)
-        const requesterCompanies = await getUserCompanies(requesterId);
-        const targetCompanies = await getUserCompanies(targetUserId);
-
-        // Regra 1: cliente/prestador pode alterar seus próprios dados ou admin pode alterar qualquer um
-        if (
-            (targetRoles.includes('cliente') || targetRoles.includes('prestador')) &&
-            (requesterId === targetUserId || requesterRoles.includes('admin'))
-        ) {
-            // permitido
-        }
-        // Regra 2: funcionário só pode ser alterado por supervisor da mesma empresa ou admin
-        else if (
-            targetRoles.includes('funcionario') &&
-            (
-                requesterRoles.includes('admin') ||
-                (
-                    requesterRoles.includes('supervisor') &&
-                    requesterCompanies.some(rc =>
-                        rc.company_role === 'supervisor' &&
-                        targetCompanies.some(tc => tc.company_id === rc.company_id)
-                    )
-                )
-            )
-        ) {
-            // permitido
-        }
-        // Regra 3: supervisor pode alterar seus próprios dados ou admin pode alterar supervisor
-        else if (
-            targetRoles.includes('supervisor') &&
-            (requesterId === targetUserId || requesterRoles.includes('admin'))
-        ) {
-            // permitido
-        }
-        // Regra 4: admin pode alterar qualquer admin
-        else if (
-            targetRoles.includes('admin') &&
-            requesterRoles.includes('admin')
-        ) {
-            // permitido
-        }
-        else {
-            return res.status(403).json({ error: 'Acesso negado para alterar este usuário.' });
-        }
-
-        // Atualização dos dados
+        // Campos permitidos para atualização (não inclui cpf ou senha)
         const { nome, email, telefone, cep, bio } = req.body;
-        const result = await db`
-            UPDATE users SET 
-                nome = COALESCE(${nome}, nome),
-                email = COALESCE(${email}, email),
-                telefone = COALESCE(${telefone}, telefone),
-                cep = COALESCE(${cep}, cep),
-                bio = COALESCE(${bio}, bio),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ${targetUserId}
-            RETURNING id, nome, email, telefone, cep, cpf, rating, bio, created_at, updated_at
-        `;
-        if (result.length === 0) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-        res.status(200).json(result[0]);
+
+        // Transação para atualizar dados
+        const result = await db.begin(async sql => {
+            const updated = await sql`
+                UPDATE users SET 
+                    nome = COALESCE(${nome}, nome),
+                    email = COALESCE(${email}, email),
+                    telefone = COALESCE(${telefone}, telefone),
+                    cep = COALESCE(${cep}, cep),
+                    bio = COALESCE(${bio}, bio),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ${targetUserId}
+                RETURNING id, nome, email, telefone, cep, cpf, rating, bio, created_at, updated_at
+            `;
+            
+            if (updated.length === 0) {
+                throw { status: 404, message: 'User not found' };
+            }
+            
+            return updated[0];
+        });
+
+        res.status(200).json(result);
     } catch (err) {
-        console.error(err);
+        console.error('PUT /users/:id ERROR:', err);
+        
+        if (err.status === 404) {
+            return res.status(404).json({ error: err.message });
+        }
+        
+        // Tratamento de erro de UNIQUE constraint (email)
+        if (err.code === '23505' && err.constraint === 'users_email_key') {
+            return res.status(400).json({ error: 'Email já cadastrado.' });
+        }
+        
         res.status(500).json({ error: 'Internal Server Error' });
     }
-});
-
-// PUT - Atualizar usuário autenticado (mantém para compatibilidade, mas usa a mesma lógica)
-router.put('/me', authenticateToken, async (req, res) => {
-    req.params.id = req.user.id;
-    return router.handle(req, res);
 });
 
 // DELETE - Deletar usuário autenticado
@@ -178,7 +139,7 @@ router.delete('/me', authenticateToken, async (req, res) => {
         }
         res.status(200).json({ message: 'User deleted successfully' });
     } catch (err) {
-        console.error(err);
+        console.error('DELETE /users/me ERROR:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
@@ -195,7 +156,7 @@ router.delete('/:id', authenticateToken, authorizeRoles('admin'), async (req, re
         }
         res.status(200).json({ message: 'User deleted successfully' });
     } catch (err) {
-        console.error(err);
+        console.error('DELETE /users/:id ERROR:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });

@@ -5,9 +5,7 @@ const dbModule = require('../db.mjs');
 const db = dbModule.default;
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { authenticateToken } = require('../middleware/auth');
-
-const tokenBlacklist = [];
+const { authenticateToken, revokeToken } = require('../middleware/auth');
 
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '10', 10);
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
@@ -24,7 +22,7 @@ async function getUserRoles(userId) {
 // Cadastro de usuário (cliente ou prestador)
 router.post('/register', async (req, res) => {
   try {
-    const { nome, email, senha, telefone, cep, cpf, bio, role } = req.body;
+    const { nome, email, senha, telefone, cep, cpf, bio, role = 'cliente' } = req.body;
 
     // Apenas cliente ou prestador podem se registrar
     if (!['cliente', 'prestador'].includes(role)) {
@@ -35,32 +33,41 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'nome, email, senha e cpf são obrigatórios.' });
     }
 
-    // Verifica se já existe usuário com o mesmo email ou cpf
-    const exists = await db`
-      SELECT id FROM users WHERE email = ${email} OR cpf = ${cpf}
-    `;
-    if (exists.length > 0) {
-      return res.status(409).json({ error: 'Email ou CPF já cadastrado.' });
-    }
-
     const hashed = await bcrypt.hash(senha, SALT_ROUNDS);
 
-    // Insere usuário
-    const result = await db`
-      INSERT INTO users (nome, email, senha, telefone, cep, cpf, bio)
-      VALUES (${nome}, ${email}, ${hashed}, ${telefone || null}, ${cep || null}, ${cpf}, ${bio || null})
-      RETURNING id, nome, email, telefone, cep, cpf, bio
-    `;
-    const userId = result[0].id;
+    // Transação para criar usuário e associar role
+    const result = await db.begin(async sql => {
+      // Insere usuário
+      const userResult = await sql`
+        INSERT INTO users (nome, email, senha, telefone, cep, cpf, bio)
+        VALUES (${nome}, ${email}, ${hashed}, ${telefone || null}, ${cep || null}, ${cpf}, ${bio || null})
+        RETURNING id, nome, email, telefone, cep, cpf, bio
+      `;
+      const userId = userResult[0].id;
 
-    // Insere role
-    await db`
-      INSERT INTO role_user (user_id, role) VALUES (${userId}, ${role})
-    `;
+      // Insere role
+      await sql`
+        INSERT INTO role_user (user_id, role) VALUES (${userId}, ${role})
+      `;
 
-    res.status(201).json({ user: result[0], role });
+      return { user: userResult[0], role };
+    });
+
+    res.status(201).json(result);
   } catch (err) {
     console.error('REGISTER ERROR', err);
+    
+    // Tratamento de erros de constraint UNIQUE
+    if (err.code === '23505') { // unique_violation
+      if (err.constraint === 'users_email_key') {
+        return res.status(400).json({ error: 'Email já cadastrado.' });
+      }
+      if (err.constraint === 'users_cpf_key') {
+        return res.status(400).json({ error: 'CPF já cadastrado.' });
+      }
+      return res.status(400).json({ error: 'Email ou CPF já cadastrado.' });
+    }
+    
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
@@ -75,15 +82,24 @@ router.post('/login', async (req, res) => {
       SELECT id, nome, email, senha FROM users WHERE email = ${email}
     `;
     if (uRes.length === 0) {
-      return res.status(400).json({ error: 'Credenciais inválidas.' });
+      return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
     const user = uRes[0];
 
     const ok = await bcrypt.compare(senha, user.senha);
-    if (!ok) return res.status(400).json({ error: 'Credenciais inválidas.' });
+    if (!ok) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
     // Busca roles do usuário
     const roles = await getUserRoles(user.id);
+
+    // Registra login (não bloqueia o fluxo se falhar)
+    try {
+      await db`
+        INSERT INTO record_login (user_id) VALUES (${user.id})
+      `;
+    } catch (loginRecordErr) {
+      console.error('Erro ao registrar login (não crítico):', loginRecordErr);
+    }
 
     const token = jwt.sign(
       { userId: user.id, roles },
@@ -99,6 +115,8 @@ router.post('/login', async (req, res) => {
 });
 
 // Logout
+// NOTA: Blacklist em memória não persiste entre reinícios e não funciona em ambientes multi-instância.
+// Recomenda-se migrar para Redis ou criar tabela 'revoked_tokens' no DB para produção.
 router.post('/logout', authenticateToken, (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
@@ -109,10 +127,14 @@ router.post('/logout', authenticateToken, (req, res) => {
     return res.status(400).json({ error: 'Formato de token inválido. Use: Bearer [token]' });
   }
   const token = parts[1];
-  if (!tokenBlacklist.includes(token)) {
-    tokenBlacklist.push(token);
+  
+  // Usa a função revokeToken do middleware
+  try {
+    revokeToken(token);
+    res.json({ message: 'Logout realizado com sucesso. O token foi invalidado.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao revogar token.' });
   }
-  res.json({ message: 'Logout realizado com sucesso. O token foi invalidado.' });
 });
 
 // Endpoint para obter dados do usuário autenticado
@@ -133,7 +155,110 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
+// Solicitar recuperação de senha
+router.post('/password/forgot', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email é obrigatório.' });
+    }
+
+    // Busca usuário por email
+    const userResult = await db`
+      SELECT id FROM users WHERE email = ${email}
+    `;
+
+    // Se usuário existir, gera código de recuperação
+    if (userResult.length > 0) {
+      const userId = userResult[0].id;
+      
+      // Gera código de 6 dígitos (000000 a 999999)
+      const recoveryCode = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+      
+      try {
+        await db`
+          INSERT INTO recovery_keys (user_id, recovery_code, expired)
+          VALUES (${userId}, ${recoveryCode}, false)
+        `;
+        
+        // Em produção, aqui você enviaria o código por email
+        console.log(`Código de recuperação gerado para ${email}: ${recoveryCode}`);
+      } catch (insertErr) {
+        console.error('Erro ao criar recovery_key:', insertErr);
+      }
+    }
+
+    // Sempre retorna 200 para não vazar informação sobre existência do email
+    res.status(200).json({ message: 'Se o email existir, um código de recuperação foi enviado.' });
+  } catch (err) {
+    console.error('FORGOT PASSWORD ERROR', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Resetar senha com código de recuperação
+router.post('/password/reset', async (req, res) => {
+  try {
+    const { email, recovery_code, new_password } = req.body;
+
+    if (!email || !recovery_code || !new_password) {
+      return res.status(400).json({ error: 'Email, código de recuperação e nova senha são obrigatórios.' });
+    }
+
+    // Busca usuário
+    const userResult = await db`
+      SELECT id FROM users WHERE email = ${email}
+    `;
+
+    if (userResult.length === 0) {
+      return res.status(400).json({ error: 'Código de recuperação inválido ou expirado.' });
+    }
+
+    const userId = userResult[0].id;
+
+    // Busca último código de recuperação não expirado
+    const recoveryResult = await db`
+      SELECT id, recovery_code, expired
+      FROM recovery_keys
+      WHERE user_id = ${userId} AND expired = false
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+
+    if (recoveryResult.length === 0 || recoveryResult[0].recovery_code !== recovery_code) {
+      return res.status(400).json({ error: 'Código de recuperação inválido ou expirado.' });
+    }
+
+    const recoveryId = recoveryResult[0].id;
+
+    // Hash da nova senha
+    const hashedPassword = await bcrypt.hash(new_password, SALT_ROUNDS);
+
+    // Transação para atualizar senha e marcar código como expirado
+    await db.begin(async sql => {
+      // Atualiza senha do usuário
+      await sql`
+        UPDATE users
+        SET senha = ${hashedPassword}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${userId}
+      `;
+
+      // Marca código de recuperação como expirado
+      await sql`
+        UPDATE recovery_keys
+        SET expired = true
+        WHERE id = ${recoveryId}
+      `;
+    });
+
+    res.status(200).json({ message: 'Senha redefinida com sucesso.' });
+  } catch (err) {
+    console.error('RESET PASSWORD ERROR', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 module.exports = {
-  router,
-  tokenBlacklist
+  router
 };

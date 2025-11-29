@@ -1,117 +1,163 @@
 import express from 'express';
 import pool from '../db.js'; // pool from pg
 const router = express.Router();
+const dbModule = require('../db.mjs');
+const db = dbModule.default;
+const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 
-// ---------- Usuários (clientes) ----------
-
-// POST /usuarios -> Criar usuário com role 'cliente'
-router.post('/usuarios', async (req, res) => {
-    const nome = req.body.nome ?? req.body.name;
-    const email = req.body.email;
-    const senha = req.body.senha ?? req.body.password;
-    const telefone = req.body.telefone ?? req.body.phone;
-
-    if (!nome || !email || !senha) {
-        console.log('POST /usuarios - missing fields');
-        return res.status(400).json({ error: 'nome, email and senha are required' });
-    }
-
+// GET - Listar todos os usuários (apenas admin)
+router.get('/all', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     try {
-        const query = `
-            INSERT INTO usuarios (nome, email, senha, telefone, role)
-            VALUES ($1, $2, $3, $4, 'cliente')
-            RETURNING id, nome, email, telefone, role, created_at, updated_at
+        const result = await db`
+            SELECT u.id, u.nome, u.email, u.telefone, u.cep, u.cpf, u.rating, u.bio, u.created_at, u.updated_at,
+                   array_agg(ru.role) AS roles
+            FROM users u
+            LEFT JOIN role_user ru ON u.id = ru.user_id
+            GROUP BY u.id
+            ORDER BY u.id
         `;
-        const { rows } = await pool.query(query, [nome, email, senha, telefone]);
-        console.log('User created:', rows[0].id);
-        return res.status(201).json(rows[0]);
+        // Garante que senha nunca seja exposta
+        res.status(200).json(result);
     } catch (err) {
-        console.error('POST /usuarios error', err);
-        if (err.code === '23505') { // unique_violation
-            return res.status(409).json({ error: 'Email already in use' });
-        }
-        return res.status(500).json({ error: 'Internal Server Error' });
-    }
-});
-
-// GET /usuarios -> Listar todos os usuários (sem senha)
-router.get('/usuarios', async (_req, res) => {
-    try {
-        const query = `
-            SELECT id, nome, email, telefone, role, created_at, updated_at
-            FROM usuarios
-            ORDER BY id
-        `;
-        const { rows } = await pool.query(query);
-        console.log('Fetched users:', rows.length);
-        return res.status(200).json(rows);
-    } catch (err) {
-        console.error('GET /usuarios error', err);
-        return res.status(500).json({ error: 'Internal Server Error' });
-    }
-    try {
-        const inserted = await db`
-            INSERT INTO usuarios (nome, email, senha, telefone)
-            VALUES (${nome}, ${email}, ${senha}, ${telefone})
-            RETURNING id, nome, email, telefone, created_at, updated_at
-        `;
-        res.status(201).json(inserted[0]);
-    } catch (err) {
-        console.error(err);
-        if (err.code === '23505') { // unique_violation
-            return res.status(409).json({ error: 'Email already in use' });
-        }
+        console.error('GET /users/all ERROR:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// PUT - Atualizar Usuario
-router.put('/:id', async (req, res) => {
-    const { id } = req.params;
-    const nome = req.body.nome ?? req.body.name;
-    const email = req.body.email;
-    const senha = req.body.senha ?? req.body.password;
-    const telefone = req.body.telefone ?? req.body.phone;
-
+// GET - Listar usuário autenticado
+router.get('/me', authenticateToken, async (req, res) => {
     try {
-        // Atualiza apenas os campos fornecidos
-        const existing = await db`SELECT * FROM usuarios WHERE id = ${id}`;
-        if (existing.length === 0) {
+        const userId = req.user.id;
+        const result = await db`
+            SELECT u.id, u.nome, u.email, u.telefone, u.cep, u.cpf, u.rating, u.bio, u.created_at, u.updated_at,
+                   array_agg(ru.role) AS roles
+            FROM users u
+            LEFT JOIN role_user ru ON u.id = ru.user_id
+            WHERE u.id = ${userId}
+            GROUP BY u.id
+        `;
+        if (result.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
-
-        const updated = await db`
-            UPDATE usuarios SET
-                nome = COALESCE(${nome}, nome),
-                email = COALESCE(${email}, email),
-                senha = COALESCE(${senha}, senha),
-                telefone = COALESCE(${telefone}, telefone),
-                updated_at = CURRENT_TIMESTAMP
-            WHERE id = ${id}
-            RETURNING id, nome, email, telefone, created_at, updated_at
-        `;
-        res.status(200).json(updated[0]);
+        res.status(200).json(result[0]);
     } catch (err) {
-        console.error(err);
-        if (err.code === '23505') {
-            return res.status(409).json({ error: 'Email already in use' });
-        }
+        console.error('GET /users/me ERROR:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });
 
-// DELETE - Deletar Usuario
-router.delete('/:id', async (req, res)  => {
+// GET - Listar usuário por ID (apenas admin)
+router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     const { id } = req.params;
     try {
-        const result = await db`DELETE FROM usuarios WHERE id = ${id} RETURNING id`;
+        const result = await db`
+            SELECT u.id, u.nome, u.email, u.telefone, u.cep, u.cpf, u.rating, u.bio, u.created_at, u.updated_at,
+                   array_agg(ru.role) AS roles
+            FROM users u
+            LEFT JOIN role_user ru ON u.id = ru.user_id
+            WHERE u.id = ${id}
+            GROUP BY u.id
+        `;
+        if (result.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.status(200).json(result[0]);
+    } catch (err) {
+        console.error('GET /users/:id ERROR:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// PUT - Atualizar usuário por ID (próprio usuário ou admin)
+router.put('/:id', authenticateToken, async (req, res) => {
+    const targetUserId = parseInt(req.params.id, 10);
+    const requesterId = req.user.id;
+    const requesterRoles = req.user.roles || [];
+
+    if (isNaN(targetUserId)) {
+        return res.status(400).json({ error: 'ID inválido' });
+    }
+
+    // Autorização: próprio usuário ou admin
+    const isOwnProfile = requesterId === targetUserId;
+    const isAdmin = requesterRoles.includes('admin');
+
+    if (!isOwnProfile && !isAdmin) {
+        return res.status(403).json({ error: 'Acesso negado. Você só pode editar seu próprio perfil.' });
+    }
+
+    try {
+        // Campos permitidos para atualização (não inclui cpf ou senha)
+        const { nome, email, telefone, cep, bio } = req.body;
+
+        // Transação para atualizar dados
+        const result = await db.begin(async sql => {
+            const updated = await sql`
+                UPDATE users SET 
+                    nome = COALESCE(${nome}, nome),
+                    email = COALESCE(${email}, email),
+                    telefone = COALESCE(${telefone}, telefone),
+                    cep = COALESCE(${cep}, cep),
+                    bio = COALESCE(${bio}, bio),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ${targetUserId}
+                RETURNING id, nome, email, telefone, cep, cpf, rating, bio, created_at, updated_at
+            `;
+            
+            if (updated.length === 0) {
+                throw { status: 404, message: 'User not found' };
+            }
+            
+            return updated[0];
+        });
+
+        res.status(200).json(result);
+    } catch (err) {
+        console.error('PUT /users/:id ERROR:', err);
+        
+        if (err.status === 404) {
+            return res.status(404).json({ error: err.message });
+        }
+        
+        // Tratamento de erro de UNIQUE constraint (email)
+        if (err.code === '23505' && err.constraint === 'users_email_key') {
+            return res.status(400).json({ error: 'Email já cadastrado.' });
+        }
+        
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
+// DELETE - Deletar usuário autenticado
+router.delete('/me', authenticateToken, async (req, res) => {
+    const userId = req.user.id;
+    try {
+        const result = await db`
+            DELETE FROM users WHERE id = ${userId} RETURNING id
+        `;
         if (result.length === 0) {
             return res.status(404).json({ error: 'User not found' });
         }
         res.status(200).json({ message: 'User deleted successfully' });
+    } catch (err) {
+        console.error('DELETE /users/me ERROR:', err);
+        res.status(500).json({ error: 'Internal Server Error' });
     }
-    catch (err) {
-        console.error(err);
+});
+
+// DELETE - Deletar usuário por ID (apenas admin)
+router.delete('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await db`
+            DELETE FROM users WHERE id = ${id} RETURNING id
+        `;
+        if (result.length === 0) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        res.status(200).json({ message: 'User deleted successfully' });
+    } catch (err) {
+        console.error('DELETE /users/:id ERROR:', err);
         res.status(500).json({ error: 'Internal Server Error' });
     }
 });

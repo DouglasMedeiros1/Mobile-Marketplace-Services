@@ -9,10 +9,7 @@ CREATE TYPE service_status_enum AS ENUM ('aberto', 'em andamento', 'concluido', 
 -- Tabelas (nomes em snake_case)
 CREATE TABLE categories (
     id SERIAL PRIMARY KEY,
-    nome VARCHAR(100) NOT NULL,
-    area VARCHAR(100) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    nome VARCHAR(100) NOT NULL
 );
 
 CREATE TABLE users (
@@ -21,8 +18,6 @@ CREATE TABLE users (
     email VARCHAR(150) UNIQUE NOT NULL,
     senha VARCHAR(255) NOT NULL,
     telefone VARCHAR(20),
-    cep CHAR(10),
-    cpf CHAR(14) UNIQUE NOT NULL,
     rating REAL CHECK (rating BETWEEN 0 AND 5) DEFAULT 0,
     bio TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -60,6 +55,7 @@ CREATE TABLE services (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     descricao TEXT,
+    categoria_id INTEGER NOT NULL REFERENCES categorias(id),
     valor_minimo NUMERIC(10,2) NOT NULL,
     valor_maximo NUMERIC(10,2) NOT NULL,
     data_inicio TIMESTAMP,
@@ -122,3 +118,4 @@ CREATE TABLE recovery_keys (
     expired BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+

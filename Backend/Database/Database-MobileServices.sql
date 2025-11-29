@@ -1,76 +1,121 @@
--- Conecte-se ao banco antes de rodar os CREATE TABLE (psql): \c MobileServices
 
 CREATE DATABASE MobileServices;
+\c MobileServices; 
 
+CREATE TYPE role_enum AS ENUM ('admin', 'cliente', 'prestador');
+CREATE TYPE company_role_enum AS ENUM ('supervisor', 'funcionario');
+CREATE TYPE service_status_enum AS ENUM ('aberto', 'em andamento', 'concluido', 'cancelado');
 
-CREATE TABLE categorias (
+-- Tabelas (nomes em snake_case)
+CREATE TABLE categories (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL
 );
 
-CREATE TABLE usuarios (
+CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     senha VARCHAR(255) NOT NULL,
     telefone VARCHAR(20),
-    role VARCHAR(50) NOT NULL,
-    avaliacao_media NUMERIC(3,2) DEFAULT 0.00,
-    total_avaliacoes INTEGER DEFAULT 0,
+    rating REAL CHECK (rating BETWEEN 0 AND 5) DEFAULT 0,
+    bio TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE notificacao (
+CREATE TABLE role_user (
     id SERIAL PRIMARY KEY,
-    recorrencia_valor INTEGER NOT NULL,
-    recorrencia_medida VARCHAR(100) NOT NULL,
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role role_enum NOT NULL,
+    UNIQUE (user_id, role)
 );
 
-CREATE TABLE prestadores (
-    usuario_id INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+CREATE TABLE companies (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
     descricao TEXT,
+    endereco VARCHAR(255),
+    telefone VARCHAR(20),
+    email VARCHAR(150) UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE TABLE servicos (
+CREATE TABLE company_user (
+    id SERIAL PRIMARY KEY,
+    company_id INTEGER NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    company_role company_role_enum NOT NULL,
+    UNIQUE (company_id, user_id)
+);
+
+CREATE TABLE services (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     descricao TEXT,
     categoria_id INTEGER NOT NULL REFERENCES categorias(id),
     valor_minimo NUMERIC(10,2) NOT NULL,
     valor_maximo NUMERIC(10,2) NOT NULL,
+    data_inicio TIMESTAMP,
     data_fim TIMESTAMP NOT NULL,
+    local VARCHAR(150),
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     metodo_pagamento VARCHAR(50),
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
-    categoria_id INTEGER NOT NULL REFERENCES categorias(id),
+    category_id INTEGER NOT NULL REFERENCES categories(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE propostas (
+CREATE TABLE proposals (
     id SERIAL PRIMARY KEY,
-    titulo VARCHAR(100),
+    service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    prestador_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     valor NUMERIC(10,2) NOT NULL,
-    data_fim TIMESTAMP NOT NULL,
-    prestador_id INTEGER NOT NULL REFERENCES prestadores(id) ON DELETE CASCADE,
-    servico_id INTEGER NOT NULL REFERENCES servicos(id) ON DELETE CASCADE,
+    mensagem TEXT,
+    status VARCHAR(50) DEFAULT 'aberto',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (service_id, prestador_id)
 );
 
-CREATE TABLE negocio (
+CREATE TABLE record_login (
     id SERIAL PRIMARY KEY,
-    servico_id INTEGER NOT NULL REFERENCES servicos(id) ON DELETE CASCADE,
-    proposta_id INTEGER NOT NULL REFERENCES propostas(id) ON DELETE CASCADE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE historico_logins (
-    id SERIAL PRIMARY KEY,
-    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     login_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE password_user (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    hash VARCHAR(255) NOT NULL,
+    salt VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_usuario_senha UNIQUE (user_id, hash)
+);
+
+CREATE TABLE record_service (
+    id SERIAL PRIMARY KEY,
+    service_id INTEGER NOT NULL REFERENCES services(id) ON DELETE CASCADE,
+    prestador_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    cliente_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    valor NUMERIC(10,2) NOT NULL,
+    data_inicio TIMESTAMP,
+    data_fim TIMESTAMP NOT NULL,
+    status service_status_enum NOT NULL,
+    avaliacao_prestador INTEGER CHECK (avaliacao_prestador BETWEEN 1 AND 5),
+    avaliacao_cliente INTEGER CHECK (avaliacao_cliente BETWEEN 1 AND 5),
+    comentario TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE recovery_keys (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    recovery_code VARCHAR(6),
+    expired BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+

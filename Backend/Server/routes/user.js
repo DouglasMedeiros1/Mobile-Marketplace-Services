@@ -1,5 +1,4 @@
 import express from 'express';
-import pool from '../db.js'; // pool from pg
 const router = express.Router();
 const dbModule = require('../db.mjs');
 const db = dbModule.default;

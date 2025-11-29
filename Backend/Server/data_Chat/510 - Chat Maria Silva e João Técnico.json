@@ -1,0 +1,41 @@
+{
+  "clienteId": 5,
+  "prestadorId": 10,
+  "clienteNome": "Maria Silva",
+  "prestadorNome": "João Técnico",
+  "createdAt": "2024-01-01T10:00:00.000Z",
+  "messages": [
+    {
+      "id": 1,
+      "senderId": 5,
+      "senderNome": "Maria Silva",
+      "message": "Olá, preciso de um reparo no meu celular",
+      "isRead": true,
+      "createdAt": "2024-01-01T10:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "senderId": 10,
+      "senderNome": "João Técnico",
+      "message": "Sim, posso ajudar! Qual é o problema?",
+      "isRead": true,
+      "createdAt": "2024-01-01T10:05:00.000Z"
+    },
+    {
+      "id": 3,
+      "senderId": 5,
+      "senderNome": "Maria Silva",
+      "message": "A tela está quebrada",
+      "isRead": true,
+      "createdAt": "2024-01-01T10:10:00.000Z"
+    },
+    {
+      "id": 4,
+      "senderId": 10,
+      "senderNome": "João Técnico",
+      "message": "Entendo. Posso fazer a troca por R$ 250. Quando você pode trazer?",
+      "isRead": false,
+      "createdAt": "2024-01-01T10:15:00.000Z"
+    }
+  ]
+}

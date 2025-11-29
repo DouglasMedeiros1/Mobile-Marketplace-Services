@@ -1,0 +1,5 @@
+# Ignora arquivos de chat de usuários reais
+# Mantém apenas o exemplo
+*
+!.gitignore
+!510 - Chat Maria Silva e João Técnico.json

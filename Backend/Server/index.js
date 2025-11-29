@@ -1,6 +1,25 @@
 const app = require('./app');
+const http = require('http');
+const { WebSocketServer } = require('ws');
+const chatModule = require('./routes/chat');
+const { setupQuickServiceWebSocket } = require('./wsManager');
 const port = 3000;
 
-app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`);
+// Cria servidor HTTP
+const server = http.createServer(app);
+
+// Cria servidor WebSocket para Chat
+const wss = new WebSocketServer({ server, path: '/chat' });
+chatModule.setupWebSocketServer(wss);
+
+// Cria servidor WebSocket para Quick Service
+setupQuickServiceWebSocket(server);
+
+console.log('✅ WebSocket servers configurados');
+
+// Inicia servidor
+server.listen(port, () => {
+  console.log(`🚀 HTTP Server listening at http://localhost:${port}`);
+  console.log(`💬 WebSocket Chat listening at ws://localhost:${port}/chat`);
+  console.log(`⚡ WebSocket Quick Service listening at ws://localhost:${port}/quick-service-ws`);
 });

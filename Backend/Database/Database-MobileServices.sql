@@ -20,6 +20,7 @@ CREATE TABLE users (
     telefone VARCHAR(20),
     rating REAL CHECK (rating BETWEEN 0 AND 5) DEFAULT 0,
     bio TEXT,
+    disponivel_servico_rapido BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -57,16 +58,19 @@ CREATE TABLE services (
     descricao TEXT,
     categoria_id INTEGER NOT NULL REFERENCES categorias(id),
     valor_minimo NUMERIC(10,2) NOT NULL,
-    valor_maximo NUMERIC(10,2) NOT NULL,
+    valor_maximo NUMERIC(10,2),
     data_inicio TIMESTAMP,
-    data_fim TIMESTAMP NOT NULL,
+    data_fim TIMESTAMP,
     local VARCHAR(150),
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     metodo_pagamento VARCHAR(50),
     category_id INTEGER NOT NULL REFERENCES categories(id),
+    quick BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX idx_services_quick ON services(quick) WHERE quick = TRUE;
 
 CREATE TABLE proposals (
     id SERIAL PRIMARY KEY,

@@ -14,7 +14,7 @@ router.get('/cliente/:userId', authenticateToken, async (req, res) => {
     const userId = parseInt(req.params.userId);
     
     // Validar permissão (só admin ou próprio usuário)
-    if (req.user.role !== 'admin' && req.user.userId !== userId) {
+    if (!req.user.roles.includes('admin') && req.user.id !== userId) {
       return res.status(403).json({ error: 'Acesso negado' });
     }
 
@@ -136,7 +136,7 @@ router.get('/prestador/:userId', authenticateToken, async (req, res) => {
     const userId = parseInt(req.params.userId);
     
     // Validar permissão (só admin ou próprio usuário)
-    if (req.user.role !== 'admin' && req.user.userId !== userId) {
+    if (!req.user.roles.includes('admin') && req.user.id !== userId) {
       return res.status(403).json({ error: 'Acesso negado' });
     }
 

@@ -21,15 +21,15 @@ async function getUserRoles(userId) {
 // Cadastro de usuário (cliente ou prestador)
 router.post('/register', async (req, res) => {
   try {
-    const { nome, email, senha, telefone, cep, cpf, bio, role = 'cliente' } = req.body;
+    const { nome, email, senha, telefone, bio, role = 'cliente' } = req.body;
 
     // Apenas cliente ou prestador podem se registrar
     if (!['cliente', 'prestador'].includes(role)) {
       return res.status(403).json({ error: 'Cadastro disponível apenas para cliente ou prestador.' });
     }
 
-    if (!nome || !email || !senha || !cpf) {
-      return res.status(400).json({ error: 'nome, email, senha e cpf são obrigatórios.' });
+    if (!nome || !email || !senha) {
+      return res.status(400).json({ error: 'nome, email e senha são obrigatórios.' });
     }
 
     const hashed = await bcrypt.hash(senha, SALT_ROUNDS);
@@ -38,9 +38,9 @@ router.post('/register', async (req, res) => {
     const result = await db.begin(async sql => {
       // Insere usuário
       const userResult = await sql`
-        INSERT INTO users (nome, email, senha, telefone, cep, cpf, bio)
-        VALUES (${nome}, ${email}, ${hashed}, ${telefone || null}, ${cep || null}, ${cpf}, ${bio || null})
-        RETURNING id, nome, email, telefone, cep, cpf, bio
+        INSERT INTO users (nome, email, senha, telefone, bio)
+        VALUES (${nome}, ${email}, ${hashed}, ${telefone || null}, ${bio || null})
+        RETURNING id, nome, email, telefone, bio
       `;
       const userId = userResult[0].id;
 
@@ -52,7 +52,20 @@ router.post('/register', async (req, res) => {
       return { user: userResult[0], role };
     });
 
-    res.status(201).json(result);
+    // Busca roles do usuário
+    const roles = [result.role];
+
+    // Gera token JWT
+    const token = jwt.sign(
+      { userId: result.user.id, roles },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    res.status(201).json({ 
+      token, 
+      user: { ...result.user, roles } 
+    });
   } catch (err) {
     console.error('REGISTER ERROR', err);
     
@@ -61,10 +74,7 @@ router.post('/register', async (req, res) => {
       if (err.constraint === 'users_email_key') {
         return res.status(400).json({ error: 'Email já cadastrado.' });
       }
-      if (err.constraint === 'users_cpf_key') {
-        return res.status(400).json({ error: 'CPF já cadastrado.' });
-      }
-      return res.status(400).json({ error: 'Email ou CPF já cadastrado.' });
+      return res.status(400).json({ error: 'Email já cadastrado.' });
     }
     
     res.status(500).json({ error: 'Internal Server Error' });
@@ -74,8 +84,11 @@ router.post('/register', async (req, res) => {
 // Login de usuário (qualquer tipo)
 router.post('/login', async (req, res) => {
   try {
-    const { email, senha } = req.body;
-    if (!email || !senha) return res.status(400).json({ error: 'email e senha são obrigatórios.' });
+    // Aceita tanto 'senha' quanto 'password' para compatibilidade com frontend
+    const { email, senha, password } = req.body;
+    const senhaFinal = senha || password;
+    
+    if (!email || !senhaFinal) return res.status(400).json({ error: 'email e senha são obrigatórios.' });
 
     const uRes = await db`
       SELECT id, nome, email, senha FROM users WHERE email = ${email}
@@ -85,7 +98,7 @@ router.post('/login', async (req, res) => {
     }
     const user = uRes[0];
 
-    const ok = await bcrypt.compare(senha, user.senha);
+    const ok = await bcrypt.compare(senhaFinal, user.senha);
     if (!ok) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
     // Busca roles do usuário
@@ -141,7 +154,7 @@ router.get('/me', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const result = await db`
-      SELECT id, nome, email, telefone, cep, cpf, bio FROM users WHERE id = ${userId}
+      SELECT id, nome, email, telefone, bio FROM users WHERE id = ${userId}
     `;
     if (result.length === 0) return res.status(404).json({ error: 'Usuário não encontrado' });
 

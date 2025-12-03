@@ -11,7 +11,7 @@ const {
 router.get('/all', authenticateToken, authorizeRoles('admin'), async (req, res) => {
     try {
         const result = await db`
-            SELECT u.id, u.nome, u.email, u.telefone, u.cep, u.cpf, u.rating, u.bio, u.created_at, u.updated_at,
+            SELECT u.id, u.nome, u.email, u.telefone, u.rating, u.bio, u.created_at, u.updated_at,
                    array_agg(ru.role) AS roles
             FROM users u
             LEFT JOIN role_user ru ON u.id = ru.user_id
@@ -31,7 +31,7 @@ router.get('/me', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
         const result = await db`
-            SELECT u.id, u.nome, u.email, u.telefone, u.cep, u.cpf, u.rating, u.bio, u.created_at, u.updated_at,
+            SELECT u.id, u.nome, u.email, u.telefone, u.rating, u.bio, u.created_at, u.updated_at,
                    array_agg(ru.role) AS roles
             FROM users u
             LEFT JOIN role_user ru ON u.id = ru.user_id
@@ -53,7 +53,7 @@ router.get('/:id', authenticateToken, authorizeRoles('admin'), async (req, res) 
     const { id } = req.params;
     try {
         const result = await db`
-            SELECT u.id, u.nome, u.email, u.telefone, u.cep, u.cpf, u.rating, u.bio, u.created_at, u.updated_at,
+            SELECT u.id, u.nome, u.email, u.telefone, u.rating, u.bio, u.created_at, u.updated_at,
                    array_agg(ru.role) AS roles
             FROM users u
             LEFT JOIN role_user ru ON u.id = ru.user_id
@@ -89,8 +89,8 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 
     try {
-        // Campos permitidos para atualização (não inclui cpf ou senha)
-        const { nome, email, telefone, cep, bio } = req.body;
+        // Campos permitidos para atualização (não inclui senha)
+        const { nome, email, telefone, bio } = req.body;
 
         // Transação para atualizar dados
         const result = await db.begin(async sql => {
@@ -99,11 +99,10 @@ router.put('/:id', authenticateToken, async (req, res) => {
                     nome = COALESCE(${nome}, nome),
                     email = COALESCE(${email}, email),
                     telefone = COALESCE(${telefone}, telefone),
-                    cep = COALESCE(${cep}, cep),
                     bio = COALESCE(${bio}, bio),
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = ${targetUserId}
-                RETURNING id, nome, email, telefone, cep, cpf, rating, bio, created_at, updated_at
+                RETURNING id, nome, email, telefone, rating, bio, created_at, updated_at
             `;
             
             if (updated.length === 0) {

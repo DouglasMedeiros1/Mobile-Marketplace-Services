@@ -3,6 +3,7 @@ const http = require('http');
 const { WebSocketServer } = require('ws');
 const chatModule = require('./routes/chat');
 const { setupQuickServiceWebSocket } = require('./wsManager');
+const { startReportNotificationScheduler } = require('./jobs/reportNotifications');
 const port = 3000;
 
 // Cria servidor HTTP
@@ -14,6 +15,9 @@ chatModule.setupWebSocketServer(wss);
 
 // Cria servidor WebSocket para Quick Service
 setupQuickServiceWebSocket(server);
+
+// Inicia agendador de notificações de relatórios
+startReportNotificationScheduler();
 
 console.log('✅ WebSocket servers configurados');
 

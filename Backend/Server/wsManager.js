@@ -178,10 +178,25 @@ function getActiveConnectionsCount() {
   return activeConnections.size;
 }
 
+/**
+ * Envia notificação de relatório para usuário
+ * @param {number} userId - ID do usuário
+ * @param {Object} notification - Dados da notificação
+ * @returns {boolean} True se enviado com sucesso
+ */
+function sendNotificationToUser(userId, notification) {
+  const payload = {
+    type: 'notification',
+    ...notification
+  };
+  return notifyUser(userId, payload);
+}
+
 module.exports = {
   setupQuickServiceWebSocket,
   notifyUser,
   sendQuickServiceRequest,
   isUserConnected,
-  getActiveConnectionsCount
+  getActiveConnectionsCount,
+  sendNotificationToUser
 };

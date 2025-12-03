@@ -29,6 +29,36 @@ router.get('/service/:serviceId', authenticateToken, async (req, res) => {
     }
 });
 
+// GET - Listar serviços onde o prestador tem propostas aceitas
+// IMPORTANTE: Esta rota deve vir ANTES de '/my' para não ser capturada por ela
+router.get('/my/accepted-services', authenticateToken, authorizeRoles('prestador'), async (req, res) => {
+    try {
+        const result = await db`
+            SELECT DISTINCT s.*, 
+                   p.id AS proposta_id,
+                   p.valor AS proposta_valor,
+                   p.mensagem AS proposta_mensagem,
+                   p.status AS proposta_status,
+                   p.created_at AS proposta_created_at,
+                   c.nome AS categoria_nome,
+                   u.nome AS cliente_nome,
+                   u.email AS cliente_email
+            FROM services s
+            JOIN proposals p ON s.id = p.service_id
+            LEFT JOIN categories c ON s.category_id = c.id
+            LEFT JOIN users u ON s.user_id = u.id
+            WHERE p.prestador_id = ${req.user.id}
+            AND p.status = 'aceito'
+            ORDER BY p.created_at DESC
+        `;
+        
+        res.status(200).json(result);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 // GET - Listar todas as propostas feitas pelo usuário autenticado (prestador)
 router.get('/my', authenticateToken, authorizeRoles('prestador'), async (req, res) => {
     try {

@@ -82,14 +82,21 @@ router.post('/request', authenticateToken, async (req, res) => {
 
     // Carregar prestadores disponíveis do JSON (não armazena coords no DB)
     const prestadoresDisponiveis = await loadAvailablePrestadores();
+    console.log(`[Quick Service] Prestadores disponíveis carregados: ${prestadoresDisponiveis.length}`);
+    console.log(`[Quick Service] Dados:`, prestadoresDisponiveis);
     
     // Filtrar por categoria e proximidade (raio máximo 5km = 5000m)
+    const prestadoresPorCategoria = prestadoresDisponiveis.filter(p => p.categoryIds.includes(categoryId));
+    console.log(`[Quick Service] Prestadores com categoria ${categoryId}: ${prestadoresPorCategoria.length}`);
+    
     const prestadoresProximos = filterByProximity(
-      prestadoresDisponiveis.filter(p => p.categoryIds.includes(categoryId)),
+      prestadoresPorCategoria,
       lat,
       lon,
       5000 // 5km
     );
+    console.log(`[Quick Service] Prestadores próximos (raio 5km): ${prestadoresProximos.length}`);
+    console.log(`[Quick Service] Dados:`, prestadoresProximos.map(p => ({ userId: p.userId, distance: p.distance })));
 
     if (prestadoresProximos.length === 0) {
       await removePendingRequest(requestId);
@@ -121,6 +128,7 @@ router.post('/request', authenticateToken, async (req, res) => {
           valorMinimo,
           distanceMeters: Math.round(prestador.distance)
         };
+        console.log(`[Quick Service] Notificando prestador ${prestador.userId} (${prestador.nome}) - Distância: ${Math.round(prestador.distance)}m`);
 
         try {
           // Aguardar resposta do prestador (timeout 15s)
@@ -131,6 +139,7 @@ router.post('/request', authenticateToken, async (req, res) => {
           );
 
           if (response === 'accept') {
+            console.log(`[Quick Service] ✅ Prestador ${prestador.userId} ACEITOU o serviço`);
             // Prestador aceitou - criar serviço no DB
             try {
               const result = await db.begin(async tx => {
@@ -221,6 +230,7 @@ router.post('/request', authenticateToken, async (req, res) => {
               continue; // Tentar próximo prestador
             }
           } else {
+            console.log(`[Quick Service] ❌ Prestador ${prestador.userId} REJEITOU o serviço`);
             // Prestador recusou
             await releaseClaim(prestador.userId);
             continue;
@@ -270,6 +280,36 @@ router.get('/available-prestadores', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('GET /quick-service/available-prestadores ERROR:', err);
     res.status(500).json({ error: 'Erro ao buscar prestadores disponíveis' });
+  }
+});
+
+// GET /quick-service/debug/state - Ver estado completo dos arquivos JSON (dev only)
+router.get('/debug/state', authenticateToken, async (req, res) => {
+  try {
+    const { loadActiveClaims, loadPendingRequests } = require('../utils/quickServiceStorage');
+    
+    const prestadores = await loadAvailablePrestadores();
+    const claims = await loadActiveClaims();
+    const requests = await loadPendingRequests();
+    
+    res.json({
+      timestamp: new Date().toISOString(),
+      availablePrestadores: {
+        count: prestadores.length,
+        data: prestadores
+      },
+      activeClaims: {
+        count: Object.keys(claims).length,
+        data: claims
+      },
+      pendingRequests: {
+        count: Object.keys(requests).length,
+        data: requests
+      }
+    });
+  } catch (err) {
+    console.error('GET /quick-service/debug/state ERROR:', err);
+    res.status(500).json({ error: 'Erro ao buscar estado do Quick Service' });
   }
 });
 

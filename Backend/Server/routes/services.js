@@ -71,8 +71,20 @@ router.post('/', authenticateToken, async (req, res) => {
         const result = await db.begin(async sql => {
             const serviceResult = await sql`
                 INSERT INTO services
-                (nome, descricao, valor_minimo, valor_maximo, data_inicio, data_fim, local, user_id, metodo_pagamento, category_id)
-                VALUES (${nome}, ${descricao}, ${valor_minimo}, ${valor_maximo}, ${data_inicio}, ${data_fim}, ${local}, ${user_id}, ${metodo_pagamento}, ${category_id})
+                (nome, descricao, valor_minimo, valor_maximo, data_inicio, data_fim, local, user_id, metodo_pagamento, category_id, quick)
+                VALUES (
+                    ${nome}, 
+                    ${descricao || null}, 
+                    ${valor_minimo}, 
+                    ${valor_maximo}, 
+                    ${data_inicio || null}, 
+                    ${data_fim}, 
+                    ${local || null}, 
+                    ${user_id}, 
+                    ${metodo_pagamento || null}, 
+                    ${category_id},
+                    false
+                )
                 RETURNING *`;
             return serviceResult[0];
         });

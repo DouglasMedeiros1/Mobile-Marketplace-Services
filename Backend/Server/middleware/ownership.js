@@ -16,8 +16,7 @@
  * - Proteger atualização de perfil (apenas próprio usuário ou admin)
  */
 
-const dbModule = require('../db.mjs');
-const db = dbModule.default;
+const db = require('../db');
 
 /**
  * Factory middleware que valida propriedade de recurso OU role admin

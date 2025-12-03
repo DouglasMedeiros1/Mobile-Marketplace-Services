@@ -39,3 +39,7 @@ jobs:
       - name: Executar Teste (Verificar Inicialização)
         # O comando "npm test" será executado na pasta "./backend"
         run: npm test
+
+      - name: Exibir logs de falha (se houver)
+        if: failure()
+        run: cat ./tests/*.js || true

@@ -1,14 +1,24 @@
-import sql from 'postgres';
-const connectionString = 'postgresql://postgres.myjxlwoizaqecbhufbtx:MobileMarketplace-ServerSupabase@aws-1-us-east-2.pooler.supabase.com:6543/postgres';
+import postgres from 'postgres';
+import dotenv from 'dotenv';
 
-const db = sql(connectionString, {
-    ssl: 'require' 
+dotenv.config();
+
+const connectionString = process.env.DATABASE_URL || 'postgresql://postgres:[YOUR_PASSWORD]@db.myjxlwoizaqecbhufbtx.supabase.co:5432/postgres';
+
+const sql = postgres(connectionString, {
+    ssl: { rejectUnauthorized: false }
 });
 
-db`SELECT now()`.then(res => {
-    console.log('✅ Conectado ao Supabase com sucesso:', res[0].now);
-}).catch(err => {
-    console.error('❌ Erro ao conectar ao Supabase:', err.message);
-});
+sql`SELECT now()`
+    .then(res => {
+        if (res && res[0] && res[0].now) {
+            console.log('✅ Conectado ao Supabase com sucesso:', res[0].now);
+        } else {
+            console.log('✅ Conectado ao Supabase (sem timestamp retornado)');
+        }
+    })
+    .catch(err => {
+        console.error('❌ Erro ao conectar ao Supabase:', err.message);
+    });
 
-export default db;
+export default sql;

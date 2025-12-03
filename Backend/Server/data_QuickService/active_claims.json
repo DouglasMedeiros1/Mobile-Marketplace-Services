@@ -1,0 +1,10 @@
+{
+  "prestador_1": {
+    "requestId": "old",
+    "expiresAt": "2025-11-30T03:10:35.511Z"
+  },
+  "prestador_2": {
+    "requestId": "new",
+    "expiresAt": "2025-11-30T03:11:06.511Z"
+  }
+}

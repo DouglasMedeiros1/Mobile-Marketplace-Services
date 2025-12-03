@@ -1,188 +1,276 @@
 // routes/auth.js
 const express = require('express');
 const router = express.Router();
-const dbModule = require('../db.mjs'); 
-const db = dbModule.default; 
+const db = require('../db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-
-const tokenBlacklist = [];
+const { authenticateToken, revokeToken } = require('../middleware/auth');
 
 const SALT_ROUNDS = parseInt(process.env.BCRYPT_SALT_ROUNDS || '10', 10);
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '1h';
 
-// REGISTER
+// Função auxiliar para buscar roles do usuário
+async function getUserRoles(userId) {
+  const rolesRes = await db`
+    SELECT role FROM role_user WHERE user_id = ${userId}
+  `;
+  return rolesRes.map(r => r.role);
+}
+
+// Cadastro de usuário (cliente ou prestador)
 router.post('/register', async (req, res) => {
   try {
-    const nome = req.body.nome || req.body.name;
-    const email = req.body.email;
-    const password = req.body.password || req.body.senha;
-    const telefone = req.body.telefone || null;
-    const cidade = req.body.cidade || null;
-    const estado = req.body.estado || null;
-    const cpf = req.body.cpf || null;
+    const { nome, email, senha, telefone, bio, role = 'cliente' } = req.body;
 
-    if (!nome || !email || !password || !cpf) {
-      return res.status(400).json({ error: 'nome, email, password e cpf são obrigatórios' });
+    // Apenas cliente ou prestador podem se registrar
+    if (!['cliente', 'prestador'].includes(role)) {
+      return res.status(403).json({ error: 'Cadastro disponível apenas para cliente ou prestador.' });
     }
 
-    const exists = await db`SELECT id FROM usuarios WHERE email = ${email}`;
-
-    if (exists.length > 0) {
-      return res.status(409).json({ error: 'Email já cadastrado' });
+    if (!nome || !email || !senha) {
+      return res.status(400).json({ error: 'nome, email e senha são obrigatórios.' });
     }
 
-    const hashed = await bcrypt.hash(password, SALT_ROUNDS);
+    const hashed = await bcrypt.hash(senha, SALT_ROUNDS);
 
-    const result = await db`
-      INSERT INTO usuarios (nome, email, senha, telefone, cidade, estado, cpf)
-       VALUES (${nome}, ${email}, ${hashed}, ${telefone}, ${cidade}, ${estado}, ${cpf})
-       RETURNING id, nome, email, telefone, cidade, estado, cpf`;
+    // Transação para criar usuário e associar role
+    const result = await db.begin(async sql => {
+      // Insere usuário
+      const userResult = await sql`
+        INSERT INTO users (nome, email, senha, telefone, bio)
+        VALUES (${nome}, ${email}, ${hashed}, ${telefone || null}, ${bio || null})
+        RETURNING id, nome, email, telefone, bio
+      `;
+      const userId = userResult[0].id;
 
+      // Insere role
+      await sql`
+        INSERT INTO role_user (user_id, role) VALUES (${userId}, ${role})
+      `;
 
-    try {
+      return { user: userResult[0], role };
+    });
 
-      await db`
-        INSERT INTO usuario_senhas (usuario_id, hash, salt, ativo)
-         VALUES (${result[0].id}, ${hashed}, '', true)`; 
-    } catch (err) {
-      if (err && err.code === '42P01') {
+    // Busca roles do usuário
+    const roles = [result.role];
 
-        console.info('usuario_senhas não existe; pulando inserção de histórico de senhas.');
-      } else {
-        console.warn('Erro ao tentar inserir em usuario_senhas (ignorando):', err.message || err);
-      }
-    }
+    // Gera token JWT
+    const token = jwt.sign(
+      { userId: result.user.id, roles },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
 
-    res.status(201).json({ user: result[0] }); 
+    res.status(201).json({ 
+      token, 
+      user: { ...result.user, roles } 
+    });
   } catch (err) {
     console.error('REGISTER ERROR', err);
+    
+    // Tratamento de erros de constraint UNIQUE
+    if (err.code === '23505') { // unique_violation
+      if (err.constraint === 'users_email_key') {
+        return res.status(400).json({ error: 'Email já cadastrado.' });
+      }
+      return res.status(400).json({ error: 'Email já cadastrado.' });
+    }
+    
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-
-// LOGIN
+// Login de usuário (qualquer tipo)
 router.post('/login', async (req, res) => {
   try {
-    const email = req.body.email;
-    const password = req.body.password || req.body.senha;
-    if (!email || !password) return res.status(400).json({ error: 'email e password são obrigatórios' });
+    // Aceita tanto 'senha' quanto 'password' para compatibilidade com frontend
+    const { email, senha, password } = req.body;
+    const senhaFinal = senha || password;
+    
+    if (!email || !senhaFinal) return res.status(400).json({ error: 'email e senha são obrigatórios.' });
 
-
-    const uRes = await db`SELECT id, nome, email, senha FROM usuarios WHERE email = ${email}`;
-
+    const uRes = await db`
+      SELECT id, nome, email, senha FROM users WHERE email = ${email}
+    `;
     if (uRes.length === 0) {
-      return res.status(400).json({ error: 'Credenciais inválidas' });
+      return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
+    const user = uRes[0];
 
-    const user = uRes[0]; 
+    const ok = await bcrypt.compare(senhaFinal, user.senha);
+    if (!ok) return res.status(401).json({ error: 'Credenciais inválidas.' });
 
-    if (user.senha) {
+    // Busca roles do usuário
+    const roles = await getUserRoles(user.id);
 
-      if (typeof user.senha === 'string' && user.senha.startsWith && user.senha.startsWith('$2')) {
-        const ok = await bcrypt.compare(password, user.senha);
-        if (ok) {
-          const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-          return res.json({ token, user: { id: user.id, nome: user.nome, email: user.email } });
-        }
-
-      } else {
-
-        console.warn(`usuarios.senha para usuário ${user.id} não parece ser bcrypt (prefixo inesperado). Tentando usuario_senhas...`);
-      }
-    }
-
-
+    // Registra login (não bloqueia o fluxo se falhar)
     try {
-
-      const hsRes = await db`
-         SELECT hash FROM usuario_senhas
-         WHERE usuario_id = ${user.id} AND ativo = true
-         ORDER BY criado_em DESC
-         LIMIT 1`;
-
-
-      if (hsRes.length > 0) {
-        const hash = hsRes[0].hash; 
-        if (typeof hash === 'string' && hash.startsWith && hash.startsWith('$2')) {
-          const ok2 = await bcrypt.compare(password, hash);
-          if (ok2) {
-            const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN });
-            return res.json({ token, user: { id: user.id, nome: user.nome, email: user.email } });
-          } else {
-            return res.status(400).json({ error: 'Credenciais inválidas' });
-          }
-        } else {
-
-          console.warn(`Hash em usuario_senhas para usuario ${user.id} não é bcrypt — não é possível comparar com bcrypt.`);
-          return res.status(400).json({ error: 'Credenciais inválidas (hash em formato incompatível)' });
-        }
-      } else {
-
-        return res.status(400).json({ error: 'Credenciais inválidas' });
-      }
-    } catch (err2) {
-
-      if (err2 && err2.code === '42P01') {
-        console.info('Tabela usuario_senhas não existe; já tentamos usuarios.senha. Retornando credenciais inválidas.');
-        return res.status(400).json({ error: 'Credenciais inválidas' });
-      } else {
-        console.error('Erro ao consultar usuario_senhas:', err2);
-        return res.status(500).json({ error: 'Internal Server Error' });
-      }
+      await db`
+        INSERT INTO record_login (user_id) VALUES (${user.id})
+      `;
+    } catch (loginRecordErr) {
+      console.error('Erro ao registrar login (não crítico):', loginRecordErr);
     }
+
+    const token = jwt.sign(
+      { userId: user.id, roles },
+      JWT_SECRET,
+      { expiresIn: JWT_EXPIRES_IN }
+    );
+
+    res.json({ token, user: { id: user.id, nome: user.nome, email: user.email, roles } });
   } catch (err) {
     console.error('LOGIN ERROR', err);
-    return res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-
-// LOGOUT 
-
-router.post('/logout', (req, res) => {
+// Logout
+// NOTA: Blacklist em memória não persiste entre reinícios e não funciona em ambientes multi-instância.
+// Recomenda-se migrar para Redis ou criar tabela 'revoked_tokens' no DB para produção.
+router.post('/logout', authenticateToken, (req, res) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
     return res.status(400).json({ error: 'Token não fornecido no cabeçalho Authorization' });
   }
-
-
   const parts = authHeader.split(' ');
   if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
     return res.status(400).json({ error: 'Formato de token inválido. Use: Bearer [token]' });
   }
-
   const token = parts[1];
-
-
-  if (!tokenBlacklist.includes(token)) {
-    tokenBlacklist.push(token);
-    console.log(`Token revogado e adicionado à blacklist. Tokens revogados: ${tokenBlacklist.length}`);
+  
+  // Usa a função revokeToken do middleware
+  try {
+    revokeToken(token);
+    res.json({ message: 'Logout realizado com sucesso. O token foi invalidado.' });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao revogar token.' });
   }
-
-  res.json({ message: 'Logout realizado com sucesso. O token foi invalidado.' });
 });
 
-
-const authMiddleware = require('../middleware/auth');
-router.get('/me', authMiddleware, async (req, res) => {
+// Endpoint para obter dados do usuário autenticado
+router.get('/me', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
-
-    const result = await db`SELECT id, nome, email, telefone, cidade, estado, cpf FROM usuarios WHERE id = ${userId}`;
-
+    const result = await db`
+      SELECT id, nome, email, telefone, bio FROM users WHERE id = ${userId}
+    `;
     if (result.length === 0) return res.status(404).json({ error: 'Usuário não encontrado' });
-    res.json(result[0]); 
+
+    // Busca roles
+    const roles = await getUserRoles(userId);
+    res.json({ ...result[0], roles });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
+// Solicitar recuperação de senha
+router.post('/password/forgot', async (req, res) => {
+  try {
+    const { email } = req.body;
+    
+    if (!email) {
+      return res.status(400).json({ error: 'Email é obrigatório.' });
+    }
+
+    // Busca usuário por email
+    const userResult = await db`
+      SELECT id FROM users WHERE email = ${email}
+    `;
+
+    // Se usuário existir, gera código de recuperação
+    if (userResult.length > 0) {
+      const userId = userResult[0].id;
+      
+      // Gera código de 6 dígitos (000000 a 999999)
+      const recoveryCode = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+      
+      try {
+        await db`
+          INSERT INTO recovery_keys (user_id, recovery_code, expired)
+          VALUES (${userId}, ${recoveryCode}, false)
+        `;
+        
+        // Em produção, aqui você enviaria o código por email
+        console.log(`Código de recuperação gerado para ${email}: ${recoveryCode}`);
+      } catch (insertErr) {
+        console.error('Erro ao criar recovery_key:', insertErr);
+      }
+    }
+
+    // Sempre retorna 200 para não vazar informação sobre existência do email
+    res.status(200).json({ message: 'Se o email existir, um código de recuperação foi enviado.' });
+  } catch (err) {
+    console.error('FORGOT PASSWORD ERROR', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Resetar senha com código de recuperação
+router.post('/password/reset', async (req, res) => {
+  try {
+    const { email, recovery_code, new_password } = req.body;
+
+    if (!email || !recovery_code || !new_password) {
+      return res.status(400).json({ error: 'Email, código de recuperação e nova senha são obrigatórios.' });
+    }
+
+    // Busca usuário
+    const userResult = await db`
+      SELECT id FROM users WHERE email = ${email}
+    `;
+
+    if (userResult.length === 0) {
+      return res.status(400).json({ error: 'Código de recuperação inválido ou expirado.' });
+    }
+
+    const userId = userResult[0].id;
+
+    // Busca último código de recuperação não expirado
+    const recoveryResult = await db`
+      SELECT id, recovery_code, expired
+      FROM recovery_keys
+      WHERE user_id = ${userId} AND expired = false
+      ORDER BY created_at DESC
+      LIMIT 1
+    `;
+
+    if (recoveryResult.length === 0 || recoveryResult[0].recovery_code !== recovery_code) {
+      return res.status(400).json({ error: 'Código de recuperação inválido ou expirado.' });
+    }
+
+    const recoveryId = recoveryResult[0].id;
+
+    // Hash da nova senha
+    const hashedPassword = await bcrypt.hash(new_password, SALT_ROUNDS);
+
+    // Transação para atualizar senha e marcar código como expirado
+    await db.begin(async sql => {
+      // Atualiza senha do usuário
+      await sql`
+        UPDATE users
+        SET senha = ${hashedPassword}, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ${userId}
+      `;
+
+      // Marca código de recuperação como expirado
+      await sql`
+        UPDATE recovery_keys
+        SET expired = true
+        WHERE id = ${recoveryId}
+      `;
+    });
+
+    res.status(200).json({ message: 'Senha redefinida com sucesso.' });
+  } catch (err) {
+    console.error('RESET PASSWORD ERROR', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
 
 module.exports = {
-  router,
-  tokenBlacklist
+  router
 };

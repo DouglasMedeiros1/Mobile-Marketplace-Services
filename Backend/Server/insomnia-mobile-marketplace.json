@@ -1,0 +1,180 @@
+{
+  "_type": "export",
+  "__export_format": 4,
+  "__export_date": "2025-11-30T00:00:00.000Z",
+  "__export_source": "insomnia.desktop.app:v2025.1.0",
+  "resources": [
+    {
+      "_id": "wrk_mobile_marketplace",
+      "_type": "workspace",
+      "name": "Mobile Marketplace Server",
+      "description": "Workspace para testar API Mobile Marketplace",
+      "scope": "collection"
+    },
+    {
+      "_id": "env_mobile_marketplace",
+      "_type": "environment",
+      "parentId": "wrk_mobile_marketplace",
+      "name": "Base Environment",
+      "data": {
+        "base_url": "http://localhost:3000",
+        "token": "",
+        "service_id": "1",
+        "other_user_id": "10"
+      }
+    },
+    {
+      "_id": "fld_api",
+      "_type": "request_group",
+      "parentId": "wrk_mobile_marketplace",
+      "name": "API"
+    },
+
+    {
+      "_id": "req_register",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Auth - Register (cliente)",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/register",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Maria Silva\",\n  \"email\": \"maria@example.com\",\n  \"senha\": \"senha123\",\n  \"cpf\": \"12345678901\",\n  \"role\": \"cliente\"\n}"
+      },
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" }
+      ],
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_register_prestador",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Auth - Register (prestador)",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/register",
+      "body": {
+        "mimeType": "application/json",
+        "text": "{\n  \"nome\": \"Jo\u00e3o T\u00e9cnico\",\n  \"email\": \"joao@example.com\",\n  \"senha\": \"senha123\",\n  \"cpf\": \"98765432100\",\n  \"role\": \"prestador\"\n}"
+      },
+      "headers": [ { "name": "Content-Type", "value": "application/json" } ],
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_login",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Auth - Login",
+      "method": "POST",
+      "url": "{{ base_url }}/auth/login",
+      "body": { "mimeType": "application/json", "text": "{\n  \"email\": \"maria@example.com\",\n  \"senha\": \"senha123\"\n}" },
+      "headers": [ { "name": "Content-Type", "value": "application/json" } ],
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_user_me",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "User - Me",
+      "method": "GET",
+      "url": "{{ base_url }}/user/me",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ],
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_services_list",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Services - List",
+      "method": "GET",
+      "url": "{{ base_url }}/services",
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_service_get",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Services - Get by ID",
+      "method": "GET",
+      "url": "{{ base_url }}/services/{{ service_id }}",
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_chat_rooms",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Chat - Rooms",
+      "method": "GET",
+      "url": "{{ base_url }}/chat/rooms",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ],
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_chat_messages_get",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Chat - Get Messages",
+      "method": "GET",
+      "url": "{{ base_url }}/chat/messages/{{ other_user_id }}",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ],
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_chat_messages_post",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "Chat - Send Message (REST)",
+      "method": "POST",
+      "url": "{{ base_url }}/chat/messages",
+      "headers": [
+        { "name": "Content-Type", "value": "application/json" },
+        { "name": "Authorization", "value": "Bearer {{ token }}" }
+      ],
+      "body": { "mimeType": "application/json", "text": "{\n  \"otherUserId\": {{ other_user_id }},\n  \"message\": \"Ol\u00e1, preciso de um or\u00e7amento\"\n}" },
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_quick_availability",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "QuickService - Set Availability (prestador)",
+      "method": "PUT",
+      "url": "{{ base_url }}/user/me/quick-availability",
+      "headers": [ { "name": "Content-Type", "value": "application/json" }, { "name": "Authorization", "value": "Bearer {{ token }}" } ],
+      "body": { "mimeType": "application/json", "text": "{\n  \"disponivel\": true,\n  \"lat\": -23.55052,\n  \"lon\": -46.633308,\n  \"categoryIds\": [1]\n}" },
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_quick_request",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "QuickService - Request (cliente)",
+      "method": "POST",
+      "url": "{{ base_url }}/quick-service/request",
+      "headers": [ { "name": "Content-Type", "value": "application/json" }, { "name": "Authorization", "value": "Bearer {{ token }}" } ],
+      "body": { "mimeType": "application/json", "text": "{\n  \"lat\": -23.55052,\n  \"lon\": -46.633308,\n  \"categoryId\": 1,\n  \"descricao\": \"Preciso de reparo\",\n  \"valorMinimo\": 150.00\n}" },
+      "authentication": {}
+    },
+
+    {
+      "_id": "req_quick_available",
+      "_type": "request",
+      "parentId": "fld_api",
+      "name": "QuickService - Available Prestadores (admin)",
+      "method": "GET",
+      "url": "{{ base_url }}/quick-service/available-prestadores",
+      "headers": [ { "name": "Authorization", "value": "Bearer {{ token }}" } ],
+      "authentication": {}
+    }
+  ]
+}

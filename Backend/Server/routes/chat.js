@@ -3,8 +3,7 @@
 
 const express = require('express');
 const router = express.Router();
-const dbModule = require('../db.mjs');
-const db = dbModule.default;
+const db = require('../db');
 const jwt = require('jsonwebtoken');
 const fs = require('fs').promises;
 const path = require('path');

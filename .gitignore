@@ -2,3 +2,7 @@
 **/dist
 
 **.env
+
+# Android APK files
+*.apk
+**/*.apk

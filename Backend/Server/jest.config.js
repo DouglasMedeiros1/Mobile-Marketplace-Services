@@ -183,6 +183,20 @@ const config = {
     "/node_modules/(?!(uuid|postgres)/)", // Transformar uuid e postgres para CommonJS
   ],
 
+  // Use babel-jest to transform JS and MJS files so ESM syntax is supported in tests
+  transform: {
+    "^.+\\.[tj]s$": "babel-jest",
+    "^.+\\.mjs$": "babel-jest"
+  },
+
+  moduleFileExtensions: [
+    "js",
+    "mjs",
+    "cjs",
+    "json",
+    "node"
+  ],
+
   // An array of regexp pattern strings that are matched against all modules before the module loader will automatically return a mock for them
   // unmockedModulePathPatterns: undefined,
 

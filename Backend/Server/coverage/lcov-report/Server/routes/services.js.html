@@ -23,16 +23,16 @@
         <div class='clearfix'>
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">12.55% </span>
+                <span class="strong">16.82% </span>
                 <span class="quiet">Statements</span>
-                <span class='fraction'>27/215</span>
+                <span class='fraction'>36/214</span>
             </div>
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">100% </span>
+                <span class="strong">50% </span>
                 <span class="quiet">Branches</span>
-                <span class='fraction'>0/0</span>
+                <span class='fraction'>2/4</span>
             </div>
         
             
@@ -44,9 +44,9 @@
         
             
             <div class='fl pad1y space-right2'>
-                <span class="strong">12.55% </span>
+                <span class="strong">16.82% </span>
                 <span class="quiet">Lines</span>
-                <span class='fraction'>27/215</span>
+                <span class='fraction'>36/214</span>
             </div>
         
             
@@ -276,8 +276,7 @@
 <a name='L211'></a><a href='#L211'>211</a>
 <a name='L212'></a><a href='#L212'>212</a>
 <a name='L213'></a><a href='#L213'>213</a>
-<a name='L214'></a><a href='#L214'>214</a>
-<a name='L215'></a><a href='#L215'>215</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<a name='L214'></a><a href='#L214'>214</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
@@ -285,10 +284,9 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -296,12 +294,12 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
-<span class="cline-any cline-no">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
 <span class="cline-any cline-no">&nbsp;</span>
@@ -493,16 +491,15 @@
 <span class="cline-any cline-yes">1x</span>
 <span class="cline-any cline-yes">1x</span></td><td class="text"><pre class="prettyprint lang-js">const express = require('express');
 const router = express.Router();
-const dbModule = require('../db.mjs'); 
-const db = dbModule.default; 
+const db = require('../db'); 
 const { authenticateToken } = require('../middleware/auth'); 
 &nbsp;
 // GET - Listar todos os serviços
 router.get('/', async (req, res) =&gt; {
-<span class="cstat-no" title="statement not covered" >    try {</span>
-<span class="cstat-no" title="statement not covered" >        const result = await db`SELECT * FROM services ORDER BY id`;</span>
-<span class="cstat-no" title="statement not covered" >        res.status(200).json(result); </span>
-<span class="cstat-no" title="statement not covered" >    } catch (err) {</span>
+    try {
+        const result = await db`SELECT * FROM services ORDER BY id`;
+        res.status(200).json(result); 
+    } <span class="branch-0 cbranch-no" title="branch not covered" >catch (err) {</span>
 <span class="cstat-no" title="statement not covered" >        console.error(err);</span>
 <span class="cstat-no" title="statement not covered" >        res.status(500).json({ error: 'Internal Server Error' });</span>
 <span class="cstat-no" title="statement not covered" >    }</span>
@@ -510,12 +507,12 @@ router.get('/', async (req, res) =&gt; {
 &nbsp;
 // GET - Obter serviço por id
 router.get('/:id', async (req, res) =&gt; {
-<span class="cstat-no" title="statement not covered" >    const { id } = req.params;</span>
-<span class="cstat-no" title="statement not covered" >    try {</span>
-<span class="cstat-no" title="statement not covered" >        const result = await db`SELECT * FROM services WHERE id = ${id}`;</span>
-<span class="cstat-no" title="statement not covered" >        if (result.length === 0) {</span>
-<span class="cstat-no" title="statement not covered" >            return res.status(404).json({ error: 'Serviço não encontrado' });</span>
-<span class="cstat-no" title="statement not covered" >        }</span>
+    const { id } = req.params;
+    try {
+        const result = await db`SELECT * FROM services WHERE id = ${id}`;
+        if (result.length === 0) {
+            return res.status(404).json({ error: 'Serviço não encontrado' });
+<span class="branch-0 cbranch-no" title="branch not covered" >        }</span>
 <span class="cstat-no" title="statement not covered" >        res.status(200).json(result[0]); </span>
 <span class="cstat-no" title="statement not covered" >    } catch (err) {</span>
 <span class="cstat-no" title="statement not covered" >        console.error(err);</span>
@@ -712,7 +709,7 @@ module.exports = router;</pre></td></tr></table></pre>
             <div class='footer quiet pad2 space-top1 center small'>
                 Code coverage generated by
                 <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
-                at 2025-11-27T18:27:33.869Z
+                at 2025-11-30T03:10:37.903Z
             </div>
         <script src="../../prettify.js"></script>
         <script>

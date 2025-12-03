@@ -1,8 +1,7 @@
 // wsManager.js - Sistema de WebSocket para Serviços Rápidos
 const { WebSocketServer } = require('ws');
 const jwt = require('jsonwebtoken');
-const dbModule = require('../db.mjs');
-const db = dbModule.default;
+const db = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 

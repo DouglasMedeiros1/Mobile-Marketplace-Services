@@ -1,9 +1,8 @@
 // routes/dashboards.js
 const express = require('express');
 const router = express.Router();
-const dbModule = require('../db.mjs');
-const db = dbModule.default;
-const { authenticateToken, isAdmin } = require('../middleware/auth');
+const db = require('../db');
+const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 
 /**
  * GET /dashboards/cliente/:userId
@@ -270,7 +269,7 @@ router.get('/prestador/:userId', authenticateToken, async (req, res) => {
  * Retorna dashboard geral da plataforma
  * Requer: autenticação como admin
  */
-router.get('/plataforma', authenticateToken, isAdmin, async (req, res) => {
+router.get('/plataforma', authenticateToken, authorizeRoles('admin'), async (req, res) => {
   try {
     // 1. Total de usuários por role
     const usuariosPorRole = await db`

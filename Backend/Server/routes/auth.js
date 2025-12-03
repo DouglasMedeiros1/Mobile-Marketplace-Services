@@ -1,8 +1,7 @@
 // routes/auth.js
 const express = require('express');
 const router = express.Router();
-const dbModule = require('../db.mjs');
-const db = dbModule.default;
+const db = require('../db');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { authenticateToken, revokeToken } = require('../middleware/auth');

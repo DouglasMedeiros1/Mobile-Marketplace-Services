@@ -1,11 +1,8 @@
-// Mock do db.mjs, bcrypt e fs
-jest.mock('../db.mjs', () => {
+// Mock do db, bcrypt e fs
+jest.mock('../db', () => {
   const mockDb = jest.fn(() => Promise.resolve([]));
   mockDb.begin = jest.fn((callback) => callback(mockDb));
-  return {
-    __esModule: true,
-    default: mockDb,
-  };
+  return mockDb;
 });
 
 jest.mock('bcrypt', () => ({
@@ -32,8 +29,7 @@ const authModule = require('../routes/auth');
 authModule.tokenBlacklist = [];
 
 const app = require('../app');
-const dbModule = require('../db.mjs');
-const db = dbModule.default;
+const db = require('../db');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'changeme';
 

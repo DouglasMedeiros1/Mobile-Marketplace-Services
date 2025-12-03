@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const dbModule = require('../db.mjs'); 
-const db = dbModule.default; 
+const db = require('../db'); 
 const { authenticateToken } = require('../middleware/auth'); 
 
 // GET - Listar todos os serviços

@@ -1,11 +1,8 @@
-// Mock do db.mjs - simula a função template tag do postgres
-jest.mock('../db.mjs', () => {
+// Mock do db - simula a função template tag do postgres
+jest.mock('../db', () => {
   const mockDb = jest.fn(() => Promise.resolve([]));
   mockDb.begin = jest.fn((callback) => callback(mockDb));
-  return {
-    __esModule: true,
-    default: mockDb,
-  };
+  return mockDb;
 });
 
 const request = require('supertest');
